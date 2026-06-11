@@ -1,0 +1,1970 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#020617">
+  <title>Dashboard Calidad INDIMON — V20</title>
+
+  <!-- Google Fonts: DM Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel (JSX transpiler) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase v10 Compat (funciona igual que v8/v9 compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+
+  <style>
+    /* ── Base ── */
+    *, ::before, ::after { font-family: 'DM Sans', 'Segoe UI', sans-serif; }
+    html { -webkit-text-size-adjust: 100%; }
+
+    /* ── Scrollbars ── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+    /* ── Safe-area for iPhone notch/home-bar ── */
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+    .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
+    /* ── Prevent iOS double-tap zoom on buttons ── */
+    button, a, input, select, textarea {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Prevent iOS input zoom: all inputs must be font-size >= 16px ── */
+    input, select, textarea { font-size: 16px; }
+    @media (min-width: 640px) { input, select, textarea { font-size: 14px; } }
+
+    /* ── Print ── */
+    @media print {
+      body { background: white !important; color: black !important; }
+      nav, .no-print { display: none !important; }
+      main { overflow: visible !important; height: auto !important; }
+    }
+
+    /* ── Animations ── */
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 5px rgba(99,102,241,.4); }
+      50% { box-shadow: 0 0 18px rgba(99,102,241,.8); }
+    }
+    @keyframes kpi-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes bar-fill { from { width: 0%; } }
+    @keyframes notif-slide {
+      from { opacity: 0; transform: translateX(16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes badge-pop {
+      0% { transform: scale(0); }
+      70% { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .ai-glow { animation: pulse-glow 2s infinite; }
+    .kpi-card { animation: kpi-in .4s ease both; }
+    .kpi-card:nth-child(1) { animation-delay: .05s; }
+    .kpi-card:nth-child(2) { animation-delay: .1s; }
+    .kpi-card:nth-child(3) { animation-delay: .15s; }
+    .kpi-card:nth-child(4) { animation-delay: .2s; }
+    .bar-anim { animation: bar-fill 1.1s cubic-bezier(.4,0,.2,1) both; }
+    .notif-item { animation: notif-slide .25s ease both; }
+    .badge-pop { animation: badge-pop .3s cubic-bezier(.4,0,.2,1); }
+    .animate-slide-up { animation: slide-up .3s ease both; }
+    .kpi-card:hover { transform: translateY(-2px); transition: transform .18s ease; }
+
+    /* ── Loading spinner ── */
+    #root > .loading-screen .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #3b82f6;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading placeholder shown before React mounts -->
+  <div id="root">
+    <div class="loading-screen" style="display:flex;align-items:center;justify-content:center;height:100dvh;background:#020617;color:#64748b;flex-direction:column;gap:16px;">
+      <div class="spinner" style="width:40px;height:40px;border:3px solid #3b82f6;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+      <p style="font-family:sans-serif;font-size:14px;font-weight:600;">Conectando con Firebase...</p>
+    </div>
+  </div>
+
+  <!-- ══ Firebase Initialization ══ -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDA-xtMTofffh7-pRmXXI4c570Wa15DFQ0",
+      authDomain: "indimon-dpto-de-calidad.firebaseapp.com",
+      projectId: "indimon-dpto-de-calidad",
+      storageBucket: "indimon-dpto-de-calidad.firebasestorage.app",
+      messagingSenderId: "454093041880",
+      appId: "1:454093041880:web:036a68ce07b783a0d8a7ad"
+    };
+    // Only initialize once (in case of hot reload)
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    // ── Colección paths ──
+    const APP_ID    = "indimon-dpto-de-calidad";
+    const base      = () => db.collection('artifacts').doc(APP_ID).collection('public').doc('data');
+    const tareasCol = () => base().collection('tareas');
+    const notifsCol = () => base().collection('notificaciones');
+
+    // Enable offline persistence for mobile reliability
+    db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+      if (err.code === 'failed-precondition') {
+        console.warn('Firebase persistence: multiple tabs open');
+      } else if (err.code === 'unimplemented') {
+        console.warn('Firebase persistence: browser not supported');
+      }
+    });
+  </script>
+
+  <!-- ══ React App (JSX via Babel) ══ -->
+  <script type="text/babel">
+
+const {useState,useEffect,useRef,useCallback}=React;
+
+// ── IA: Groq (CORS-safe) ─────────────────────────────────────────────────
+const GROQ_API_KEY="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";
+const AI_SYSTEM="Eres un ingeniero experto en gestión de calidad metalmecánica e inspector senior en INDIMON S.A.S. Respondes de forma profesional, concisa y orientada a normas como ASME e ISO 9001.";
+const callClaude=async(prompt,jsonMode=false)=>{
+  const sysMsg=jsonMode
+    ? AI_SYSTEM+" Responde ÚNICAMENTE con JSON válido, sin texto adicional ni bloques markdown."
+    : AI_SYSTEM;
+  let lastErr; let delay=800;
+  for(let i=0;i<3;i++){
+    try{
+      const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+GROQ_API_KEY},
+        body:JSON.stringify({
+          model:"llama-3.3-70b-versatile",
+          max_tokens:1500,
+          temperature:0.7,
+          messages:[{role:"system",content:sysMsg},{role:"user",content:prompt}]
+        })
+      });
+      if(!r.ok){
+        let eb=""; try{const ej=await r.json();eb=JSON.stringify(ej);}catch(x){eb=await r.text().catch(()=>"");}
+        throw new Error("HTTP "+r.status+": "+eb.slice(0,300));
+      }
+      const d=await r.json();
+      const txt=(d.choices?.[0]?.message?.content||"").trim();
+      if(!txt)throw new Error("Respuesta vacía de Groq");
+      return jsonMode?txt.replace(/```json|```/g,"").trim():txt;
+    }catch(e){lastErr=e;if(i<2)await new Promise(res=>setTimeout(res,delay));delay*=2;}
+  }
+  throw lastErr;
+};
+
+// ── Datos demo ──────────────────────────────────────────────────────────────
+const NORMAS=['ASME Sec. IX','ISO 9001','SG-SSTA','HSE','General'];
+const RIESGO_PROB=['Baja','Media','Alta'];
+const RIESGO_IMP=['Leve','Moderado','Crítico'];
+
+const DEMO=[
+  {title:'Consolidar Listado Maestro QC',block:'B1: Listado',assignee:'Ambos',start:1,end:2,status:'To Do',progress:0,priority:'Alta',subtasks:[{id:1,text:'Visitar Producción',done:false},{id:2,text:'Visitar Almacén',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Actualizar y Presentar Listado',block:'B1: Listado',assignee:'Inspector',start:5,end:7,status:'To Do',progress:0,priority:'Alta',subtasks:[{id:1,text:'Cruzar tabla de brechas',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Actualizar WPS y PQR',block:'B2: Docs Técnicos',assignee:'Inspector',start:3,end:8,status:'To Do',progress:0,priority:'Media',subtasks:[{id:1,text:'Revisar procesos',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'WPS GTAW Calibres Delgados',block:'B2: Docs Técnicos',assignee:'Inspector',start:4,end:7,status:'To Do',progress:0,priority:'Alta',subtasks:[{id:1,text:'Calificar PQR',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Guía Práctica Hidrostática',block:'B3: Guías',assignee:'Inspector',start:2,end:4,status:'To Do',progress:0,priority:'Media',subtasks:[{id:1,text:'Redactar paso a paso',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Programa de Calibración',block:'B3: Guías',assignee:'Inspector',start:4,end:6,status:'To Do',progress:0,priority:'Alta',subtasks:[{id:1,text:'Inventario de equipos',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Reorganización Servidor Calidad',block:'B4: Servidor',assignee:'Aprendiz',start:1,end:4,status:'To Do',progress:0,priority:'Media',subtasks:[{id:1,text:'Diagnóstico previo',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Infografías Procesos Taller',block:'B5: Capacitación',assignee:'Aprendiz',start:5,end:8,status:'To Do',progress:0,priority:'Baja',subtasks:[{id:1,text:'Pulido y biselado',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Banco de Preguntas Evaluación',block:'B6: Evaluaciones',assignee:'Inspector',start:4,end:7,status:'To Do',progress:0,priority:'Media',subtasks:[{id:1,text:'Preguntas soldador',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'GAP Analysis ISO 9001',block:'B7: SGC',assignee:'Inspector',start:1,end:3,status:'To Do',progress:0,priority:'Media',subtasks:[{id:1,text:'Identificar cláusulas',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Metrología de producción',block:'Espontánea',assignee:'Ambos',start:1,end:10,status:'To Do',progress:0,priority:'Alta',subtasks:[{id:1,text:'Atender solicitud',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+  {title:'Dossier: Trampa de Succión',block:'Dossiers',assignee:'Ambos',start:3,end:6,status:'To Do',progress:0,priority:'Alta',subtasks:[{id:1,text:'Recopilar certificados',done:false}],timeSpent:0,isTracking:false,blockReason:'',attachments:[]},
+];
+
+const fmtTime=s=>{s=s||0;return`${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`};
+const fmtDate=ts=>ts?new Date(ts).toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+
+const STATUS_LABEL={'To Do':'Pendiente','In Progress':'En Progreso','Blocked':'Bloqueada','Done':'Completada'};
+const STATUS_ICON={'To Do':'fa-circle-dot','In Progress':'fa-circle-half-stroke','Blocked':'fa-lock','Done':'fa-circle-check'};
+const STATUS_COLOR={'To Do':'text-slate-400','In Progress':'text-blue-400','Blocked':'text-red-400','Done':'text-emerald-400'};
+
+// ═══════════════════════════════════════════════════════════════
+function App(){
+  const [user,setUser]=useState(null);
+  const [tasks,setTasks]=useState([]);
+  const [notifications,setNotifications]=useState([]);
+  const [activeTab,setActiveTab]=useState('kanban');
+  const [darkMode,setDarkMode]=useState(true);
+  const [currentWeek,setCurrentWeek]=useState(1);
+  const [filterAssignee,setFilterAssignee]=useState('Todos');
+  const [filterBlock,setFilterBlock]=useState('Todos');
+  const [filterWeekOnly,setFilterWeekOnly]=useState(false);
+  const [searchTerm,setSearchTerm]=useState('');
+  const [expandedTask,setExpandedTask]=useState(null);
+  const [newAttLink,setNewAttLink]=useState('');
+  const [blockingId,setBlockingId]=useState(null);
+  const [blockReason,setBlockReason]=useState('');
+  const [showAddModal,setShowAddModal]=useState(false);
+  const [editTask,setEditTask]=useState(null);
+  const [isLoadingDemo,setIsLoadingDemo]=useState(false);
+  const [newTask,setNewTask]=useState({title:'',block:'General',assignee:'Inspector',priority:'Media',start:1,end:2,norma:'General',entregable:false,aprobador:''});
+  const [aiLoading,setAiLoading]=useState({});
+  const [aiSummary,setAiSummary]=useState(null);
+  const [aiGenSummary,setAiGenSummary]=useState(false);
+  const [newSubInputs,setNewSubInputs]=useState({});
+  const [toast,setToast]=useState(null);
+  const [noteInputs,setNoteInputs]=useState({});
+  const [notesCollapsed,setNotesCollapsed]=useState({});
+  const [emailList,setEmailList]=useState(()=>{try{return JSON.parse(localStorage.getItem('indimon_emails')||'["produccion@indimon.com.co"]');}catch{return['produccion@indimon.com.co'];}});
+  const [showEmailConfig,setShowEmailConfig]=useState(false);
+  const [newEmailInput,setNewEmailInput]=useState('');
+  const [fbStatus,setFbStatus]=useState('connecting');
+  const [showNotifs,setShowNotifs]=useState(false);
+  const [unread,setUnread]=useState(0);
+  const lastSeenRef=useRef(localStorage.getItem('indimon_lastSeen')||0);
+  const notifsRef=useRef(null);
+
+  // ── Auth ──
+  useEffect(()=>{
+    auth.signInAnonymously().catch(e=>{console.error(e);setFbStatus('error');});
+    return auth.onAuthStateChanged(u=>setUser(u));
+  },[]);
+
+  // ── Listener tareas ──
+  useEffect(()=>{
+    if(!user)return;
+    setFbStatus('connecting');
+    return tareasCol().onSnapshot(snap=>{
+      const list=snap.docs.map(d=>({id:d.id,...d.data()}));
+      list.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+      setTasks(list);
+      setFbStatus('online');
+    },err=>{console.error(err);setFbStatus('error');});
+  },[user]);
+
+  // ── Listener notificaciones ──
+  useEffect(()=>{
+    if(!user)return;
+    return notifsCol().orderBy('ts','desc').limit(50).onSnapshot(snap=>{
+      const list=snap.docs.map(d=>({id:d.id,...d.data()}));
+      setNotifications(list);
+      const lastSeen=Number(lastSeenRef.current)||0;
+      const newCount=list.filter(n=>(n.ts||0)>lastSeen).length;
+      setUnread(newCount);
+    },()=>{});
+  },[user]);
+
+  // ── Cerrar panel notifs al click fuera ──
+  useEffect(()=>{
+    const handler=e=>{if(notifsRef.current&&!notifsRef.current.contains(e.target))setShowNotifs(false);};
+    document.addEventListener('mousedown',handler);
+    return()=>document.removeEventListener('mousedown',handler);
+  },[]);
+
+  // ── Notas: sincronizar con tasks cuando cambien desde Firebase ──
+  useEffect(()=>{
+    setNoteInputs(prev=>{
+      const updated={...prev};
+      tasks.forEach(t=>{if(!(t.id in updated))updated[t.id]=t.taskNote||'';});
+      return updated;
+    });
+  },[tasks.map(t=>t.id).join(',')]); // eslint-disable-line
+
+  // ── Alerta automática rendimiento semanal ──
+  useEffect(()=>{
+    if(tasks.length===0)return;
+    const semTasks=tasks.filter(t=>t.start<=currentWeek&&t.end>=currentWeek);
+    if(semTasks.length===0)return;
+    const pct=Math.round(semTasks.reduce((a,t)=>a+(t.progress||0),0)/semTasks.length);
+    if(pct<70){
+      const key=`alert_s${currentWeek}`;
+      const last=localStorage.getItem(key);
+      if(!last||Date.now()-Number(last)>3600000*12){
+        addNotif('fa-triangle-exclamation',`⚠️ Alerta Semana ${currentWeek}`,`El avance de la semana ${currentWeek} es ${pct}% (< 70%). Se requiere acción correctiva inmediata.`,'red');
+        localStorage.setItem(key,Date.now().toString());
+      }
+    }
+  },[currentWeek,tasks.length]);
+
+  // ── Recordatorio viernes 14:00 ──
+  useEffect(()=>{
+    const check=()=>{
+      const now=new Date();
+      if(now.getDay()===5&&now.getHours()===14&&now.getMinutes()===0){
+        const key=`friday_${now.toDateString()}`;
+        if(!localStorage.getItem(key)){
+          addNotif('fa-calendar-check','📋 Recordatorio Viernes',`Recuerda actualizar el resumen semanal de la Semana ${currentWeek} antes de cerrar jornada.`,'indigo');
+          localStorage.setItem(key,'1');
+        }
+      }
+    };
+    const iv=setInterval(check,60000);
+    check();
+    return()=>clearInterval(iv);
+  },[currentWeek]);
+
+  useEffect(()=>{document.body.className=darkMode?'bg-slate-950 text-slate-100':'bg-slate-50 text-slate-800';},[darkMode]);
+
+  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(null),3500);};
+
+  const addNotif=(icon,title,body,color='blue')=>{
+    notifsCol().add({icon,title,body,color,ts:Date.now(),read:false}).catch(()=>{});
+  };
+
+  const markAllRead=()=>{
+    const now=Date.now();
+    lastSeenRef.current=now;
+    localStorage.setItem('indimon_lastSeen',now);
+    setUnread(0);
+    setShowNotifs(false);
+  };
+
+  // ── DB ──
+  const dbUpdate=(id,fields)=>tareasCol().doc(id).update(fields).catch(console.error);
+  const dbDelete=id=>{if(confirm('¿Eliminar esta tarea de Firebase?'))tareasCol().doc(id).delete();};
+  const dbAdd=data=>tareasCol().add({...data,createdAt:Date.now()});
+
+  const loadDemo=async()=>{
+    setIsLoadingDemo(true);
+    for(const t of DEMO)await dbAdd(t);
+    addNotif('fa-download','Datos demo cargados','Se cargaron '+DEMO.length+' tareas de demostración.','blue');
+    setIsLoadingDemo(false);
+    showToast('✅ Tareas cargadas');
+  };
+
+  const resetDemo=async()=>{
+    if(!confirm('¿Reiniciar todas las tareas al estado inicial?\n\nEsto eliminará el progreso actual y cargará las tareas demo desde cero.'))return;
+    setIsLoadingDemo(true);
+    try{
+      // Eliminar todas las tareas existentes
+      const snap=await tareasCol().get();
+      const batch=db.batch();
+      snap.docs.forEach(d=>batch.delete(d.ref));
+      await batch.commit();
+      // Cargar tareas demo limpias
+      for(const t of DEMO)await dbAdd(t);
+      addNotif('fa-rotate-left','Tareas reiniciadas','Todas las tareas fueron restablecidas al estado inicial.','indigo');
+      showToast('🔄 Tareas reiniciadas correctamente');
+    }catch(e){
+      console.error(e);
+      showToast('❌ Error al reiniciar tareas');
+    }
+    setIsLoadingDemo(false);
+  };
+
+  const sendEmailAlert=async(subject,body)=>{
+    // Notificación interna siempre
+    addNotif('fa-envelope','Alerta de correo',`${subject}`,'emerald');
+    // Envío real via EmailJS a cada destinatario
+    const recipients=emailList.length>0?emailList:['produccion@indimon.com.co'];
+    for(const email of recipients){
+      try{
+        const payload={
+          service_id:'service_ho3m0e3',
+          template_id:'template_c4kaxce',
+          user_id:'ZGCBtzjGPs1NCZMKk',
+          template_params:{
+            subject:subject,
+            message:body,
+            to_email:email,
+            to_name:'INDIMON Calidad',
+            email:email,
+            reply_to:'produccion@indimon.com.co',
+            from_name:'Dashboard INDIMON'
+          }
+        };
+        const res=await fetch('https://api.emailjs.com/api/v1.0/email/send',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','origin':'http://localhost'},
+          body:JSON.stringify(payload)
+        });
+        const txt=await res.text();
+        if(res.ok){
+          addNotif('fa-circle-check','Correo enviado',`✅ Enviado a ${email}: ${subject}`,'emerald');
+        }else{
+          addNotif('fa-triangle-exclamation','Error correo',`❌ EmailJS (${email}): ${txt}`,'red');
+          console.error('EmailJS error:',res.status,txt);
+        }
+      }catch(e){
+        addNotif('fa-triangle-exclamation','Error correo',`❌ Error de red (${email}): ${e.message}`,'red');
+        console.error('EmailJS fetch error:',e);
+      }
+    }
+  };
+
+  const handleCreateTask=async()=>{
+    if(!newTask.title.trim())return;
+    await dbAdd({...newTask,status:'To Do',progress:0,subtasks:[],taskNote:'',blockReason:'',attachments:[],riesgoProbabilidad:'Baja',riesgoImpacto:'Leve'});
+    addNotif('fa-plus','Tarea creada',`"${newTask.title}" fue añadida al tablero.`,'blue');
+    setShowAddModal(false);
+    setNewTask({title:'',block:'General',assignee:'Inspector',priority:'Media',start:currentWeek,end:currentWeek+1,norma:'General',entregable:false,aprobador:''});
+    showToast('✅ Tarea creada');
+  };
+
+  const handleSaveEdit=async()=>{
+    if(!editTask||!editTask.title.trim())return;
+    const{id,...fields}=editTask;
+    await dbUpdate(id,{title:fields.title,block:fields.block,assignee:fields.assignee,priority:fields.priority,start:fields.start,end:fields.end});
+    addNotif('fa-pen','Tarea editada',`"${fields.title}" fue actualizada.`,'indigo');
+    setEditTask(null);
+    showToast('✅ Cambios guardados');
+  };
+
+  const moveTask=(taskId,newStatus,reason='')=>{
+    const task=tasks.find(t=>t.id===taskId);
+    const upd={status:newStatus,blockReason:reason};
+    if(newStatus==='Done'){upd.progress=100;upd.completedAt=Date.now();}
+    dbUpdate(taskId,upd);
+    const icons={'To Do':'fa-circle-dot','In Progress':'fa-play','Blocked':'fa-lock','Done':'fa-circle-check'};
+    const colors={'To Do':'slate','In Progress':'blue','Blocked':'red','Done':'emerald'};
+    if(task){
+      addNotif(icons[newStatus]||'fa-arrow-right',`Tarea → ${STATUS_LABEL[newStatus]}`,`"${task.title}" cambió a ${STATUS_LABEL[newStatus]}.`,colors[newStatus]||'blue');
+      if(newStatus==='Done'){
+        const bloqueCheck=tasks.filter(t=>t.status!=='Done'&&t.id!==taskId);
+        const weekProgress=tasks.filter(t=>t.start<=currentWeek&&t.end>=currentWeek);
+        const pctWeek=weekProgress.length>0?Math.round(weekProgress.filter(t=>t.status==='Done'||t.id===taskId).length/weekProgress.length*100):100;
+        sendEmailAlert(`✅ Tarea completada: ${task.title}`,`La tarea "${task.title}" (Bloque: ${task.block||'-'}, Norma: ${task.norma||'-'}, Entregable: ${task.entregable?'Sí':'No'}) fue completada en la semana ${currentWeek}. Progreso de semana: ${pctWeek}%. Aprobador: ${task.aprobador||'N/A'}.`);
+      }
+      if(newStatus==='Blocked'){
+        sendEmailAlert(`🛑 Tarea bloqueada: ${task.title}`,`La tarea "${task.title}" fue marcada como bloqueada. Motivo: ${reason||'Sin especificar'}. Responsable: ${task.assignee}.`);
+      }
+    }
+  };
+
+  const saveNote=(task,val)=>{
+    if(val!==(task.taskNote||''))dbUpdate(task.id,{taskNote:val});
+  };
+
+  const stepProgress=(task,step)=>dbUpdate(task.id,{progress:Math.min(99,Math.max(1,(task.progress||0)+step))});
+  const toggleSubtask=(task,subId)=>dbUpdate(task.id,{subtasks:task.subtasks.map(s=>s.id===subId?{...s,done:!s.done}:s)});
+  const deleteSubtask=(task,subId)=>dbUpdate(task.id,{subtasks:(task.subtasks||[]).filter(s=>s.id!==subId)});
+  const addSubtask=(task,text)=>{
+    if(!text.trim())return;
+    dbUpdate(task.id,{subtasks:[...(task.subtasks||[]),{id:Date.now(),text:text.trim(),done:false}]});
+    setNewSubInputs(p=>({...p,[task.id]:''}));
+    showToast('✅ Subtarea agregada');
+  };
+  const addAttachment=task=>{
+    if(!newAttLink)return;
+    dbUpdate(task.id,{attachments:[...(task.attachments||[]),{id:Date.now(),url:newAttLink}]});
+    setNewAttLink('');
+  };
+
+  const exportCSV=()=>{
+    const h=['Nombre','Bloque','Responsable','Inicio','Fin','Estado','Progreso','Prioridad'];
+    const rows=tasks.map(t=>[`"${t.title}"`,`"${t.block}"`,t.assignee,t.start,t.end,t.status,t.progress,t.priority]);
+    const csv="\uFEFF"+h.join(';')+'\n'+rows.map(r=>r.join(';')).join('\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download=`INDIMON_S${currentWeek}.csv`;a.click();
+  };
+
+  // ── Descarga Informe Gerencial ──
+  const downloadReport=()=>{
+    const now=new Date().toLocaleString('es-CO',{day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const totalT=tasks.length;
+    const doneT=tasks.filter(t=>t.status==='Done').length;
+    const inPT=tasks.filter(t=>t.status==='In Progress').length;
+    const blkT=tasks.filter(t=>t.status==='Blocked').length;
+    const todoT=tasks.filter(t=>t.status==='To Do').length;
+    const prog=totalT>0?Math.round((tasks.reduce((a,t)=>a+(t.progress||0),0)/(totalT*100))*100):0;
+    const effic=totalT>0?Math.round(((doneT+inPT*0.5)/totalT)*100):0;
+    const blocks=[...new Set(tasks.map(t=>t.block))];
+    const blockRows=blocks.map(b=>{
+      const bt=tasks.filter(t=>t.block===b);
+      const bp=bt.length>0?Math.round(bt.reduce((a,t)=>a+(t.progress||0),0)/bt.length):0;
+      const bDone=bt.filter(t=>t.status==='Done').length;
+      const bBlk=bt.filter(t=>t.status==='Blocked').length;
+      return `<tr><td>${b}</td><td>${bt.length}</td><td>${bDone}</td><td>${bBlk}</td><td><div class="bar"><div class="bar-fill" style="width:${bp}%;background:${bBlk>0?'#ef4444':bp>=75?'#22c55e':'#3b82f6'}"></div></div>${bp}%</td></tr>`;
+    }).join('');
+    const blockedRows=tasks.filter(t=>t.status==='Blocked').map(t=>`<tr class="blocked-row"><td>${t.title}</td><td>${t.block}</td><td>${t.assignee}</td><td>${t.blockReason||'Sin motivo registrado'}</td><td>S${t.start}–S${t.end}</td></tr>`).join('');
+    const allRows=tasks.map(t=>{
+      const sc={'Done':'✅ Completada','In Progress':'🔵 En Progreso','Blocked':'🔴 Bloqueada','To Do':'⚪ Pendiente'}[t.status]||t.status;
+      const pr=t.priority==='Alta'?'🔴 Alta':t.priority==='Media'?'🟡 Media':'🟢 Baja';
+      return `<tr class="${t.status==='Blocked'?'blocked-row':t.status==='Done'?'done-row':''}"><td>${t.title}</td><td>${t.block}</td><td>${t.assignee}</td><td>${pr}</td><td>${t.norma||'General'}</td><td>S${t.start}–S${t.end}</td><td>${sc}</td><td>${t.progress||0}%</td><td>${t.aprobador||'—'}</td></tr>`;
+    }).join('');
+    const aiSection=aiSummary?`<div class="ai-box"><h3>📊 Análisis IA (Groq — Llama 3)</h3><p>${aiSummary.replace(/\n/g,'<br/>')}</p></div>`:`<div class="ai-box muted"><p>No se generó análisis IA. Use la sección KPIs para generar uno antes de descargar.</p></div>`;
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe Gerencial — INDIMON Calidad</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',sans-serif;background:#f8fafc;color:#1e293b;padding:40px}
+  .header{background:linear-gradient(135deg,#0a2540,#1a4473);color:white;padding:36px 40px;border-radius:16px;margin-bottom:32px}
+  .header h1{font-size:28px;font-weight:800;letter-spacing:1px}
+  .header p{opacity:.7;margin-top:6px;font-size:13px}
+  .header .meta{display:flex;gap:24px;margin-top:18px;font-size:12px;opacity:.6}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+  .kpi{background:white;border-radius:12px;padding:20px 24px;border:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .kpi .val{font-size:36px;font-weight:900;font-family:monospace;margin:4px 0}
+  .kpi .lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b}
+  .kpi .sub{font-size:11px;color:#94a3b8;margin-top:2px}
+  .green{color:#22c55e}.blue{color:#3b82f6}.amber{color:#f59e0b}.red{color:#ef4444}.slate{color:#64748b}
+  .section{background:white;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:24px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .section-header{padding:16px 24px;border-bottom:1px solid #f1f5f9;background:#f8fafc}
+  .section-header h2{font-size:14px;font-weight:700;color:#334155;display:flex;align-items:center;gap:8px}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{padding:10px 16px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0}
+  td{padding:9px 16px;border-bottom:1px solid #f8fafc;color:#334155}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fafafa}
+  .blocked-row td{background:#fff5f5;color:#b91c1c}
+  .done-row td{color:#166534}
+  .bar{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;min-width:80px;display:inline-block;vertical-align:middle;margin-right:6px}
+  .bar-fill{height:100%;border-radius:4px}
+  .ai-box{padding:24px;font-size:13px;line-height:1.8;color:#334155}
+  .ai-box h3{font-size:14px;font-weight:700;margin-bottom:12px;color:#1e293b}
+  .muted{color:#94a3b8;font-style:italic}
+  .footer{text-align:center;font-size:11px;color:#94a3b8;margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700}
+  .badge-green{background:#dcfce7;color:#166534}
+  .badge-red{background:#fee2e2;color:#b91c1c}
+  .badge-blue{background:#dbeafe;color:#1d4ed8}
+  @media print{body{padding:20px}@page{margin:15mm}}
+</style></head><body>
+<div class="header">
+  <h1>🏭 INDIMON S.A.S. — Informe Ejecutivo de Calidad</h1>
+  <p>Departamento de Calidad · Control de Gestión de Proyectos</p>
+  <div class="meta"><span>📅 Generado: ${now}</span><span>📋 Semana actual: S${currentWeek}</span><span>🗄️ Fuente: Firebase Firestore (tiempo real)</span></div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="lbl">Cumplimiento Global</div><div class="val ${prog>=75?'green':prog>=40?'amber':'blue'}">${prog}%</div><div class="sub">Progreso promedio de ${totalT} tareas</div></div>
+  <div class="kpi"><div class="lbl">Completadas</div><div class="val green">${doneT}</div><div class="sub">de ${totalT} · ${totalT>0?Math.round(doneT/totalT*100):0}% finalización</div></div>
+  <div class="kpi"><div class="lbl">En Progreso</div><div class="val blue">${inPT}</div><div class="sub">Semana ${currentWeek} · Eficiencia: ${effic}%</div></div>
+  <div class="kpi"><div class="lbl">Bloqueadas</div><div class="val ${blkT>0?'red':'slate'}">${blkT}</div><div class="sub">${blkT>0?'⚠️ Requieren atención inmediata':'Sin bloqueos activos'}</div></div>
+</div>
+
+<div class="section">
+  <div class="section-header"><h2>🤖 Análisis Ejecutivo IA</h2></div>
+  ${aiSection}
+</div>
+
+<div class="section">
+  <div class="section-header"><h2>📦 Avance por Bloque de Trabajo</h2></div>
+  <table><thead><tr><th>Bloque</th><th>Total</th><th>Completadas</th><th>Bloqueadas</th><th>Progreso</th></tr></thead>
+  <tbody>${blockRows}</tbody></table>
+</div>
+
+${blkT>0?`<div class="section">
+  <div class="section-header"><h2>🛑 Tareas Bloqueadas — Acción Requerida</h2></div>
+  <table><thead><tr><th>Tarea</th><th>Bloque</th><th>Responsable</th><th>Motivo del Bloqueo</th><th>Semanas</th></tr></thead>
+  <tbody>${blockedRows}</tbody></table>
+</div>`:''}
+
+<div class="section">
+  <div class="section-header"><h2>📋 Registro Completo de Actividades</h2></div>
+  <table><thead><tr><th>Actividad</th><th>Bloque</th><th>Responsable</th><th>Prioridad</th><th>Norma</th><th>Semanas</th><th>Estado</th><th>Avance</th><th>Aprobador</th></tr></thead>
+  <tbody>${allRows}</tbody></table>
+</div>
+
+<div class="footer">
+  <p>INDIMON S.A.S. — Departamento de Calidad · Documento generado automáticamente desde el Dashboard de Gestión V17</p>
+  <p style="margin-top:4px">Normas de referencia: ASME Sec. IX · ISO 9001 · SG-SSTA · HSE</p>
+</div>
+</body></html>`;
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`INDIMON_Informe_Gerencial_S${currentWeek}_${new Date().toISOString().slice(0,10)}.html`;
+    a.click();
+    showToast('📄 Informe gerencial descargado');
+  };
+
+  // ── IA ──
+  const genSubtasks=async task=>{
+    setAiLoading(p=>({...p,[task.id]:true}));
+    try{
+      const res=await callClaude(`Desglosa la tarea "${task.title}" del taller INDIMON en exactamente 3 pasos clave de acción. Responde SOLO con este JSON: {"steps":["paso1","paso2","paso3"]}`,true);
+      const parsed=JSON.parse(res);
+      const steps=parsed.steps||[];
+      if(steps.length){
+        dbUpdate(task.id,{subtasks:[...(task.subtasks||[]),...steps.map((s,i)=>({id:Date.now()+i,text:`✨ ${s}`,done:false}))]});
+        addNotif('fa-wand-magic-sparkles','IA generó pasos',`Subtareas generadas para "${task.title}".`,'indigo');
+        showToast('✨ Pasos generados con Claude');
+      }
+    }catch(e){showToast('❌ Error IA: '+(e&&e.message?e.message.slice(0,80):String(e)));}
+    setAiLoading(p=>({...p,[task.id]:false}));
+  };
+
+  const genSummary=async()=>{
+    setAiGenSummary(true);
+    setAiSummary(null);
+    const bloqueos=tasks.filter(t=>t.status==='Blocked').map(t=>`"${t.title}" (motivo: ${t.blockReason||'no especificado'})`).join(', ')||'ninguno';
+    const datos=`Semana:${currentWeek}/10. Progreso global:${generalProgress}%. Total tareas:${totalTasks}, Completadas:${completedTasks}, En progreso:${inProgressTasks}, Bloqueadas:${blockedTasks}, Pendientes:${totalTasks-completedTasks-inProgressTasks-blockedTasks}. Tareas bloqueadas: ${bloqueos}.`;
+    try{setAiSummary(await callClaude(`Escribe un resumen ejecutivo formal (3 párrafos) del departamento de Calidad de INDIMON: ${datos}. Tono gerencial, destaca logros, riesgos y recomendaciones concretas de acción.`));}
+    catch(e){setAiSummary('❌ Error Groq API: '+(e&&e.message?e.message:String(e)));}
+    setAiGenSummary(false);
+  };
+
+  // ── KPIs ──
+  const totalTasks=tasks.length;
+  const completedTasks=tasks.filter(t=>t.status==='Done').length;
+  const blockedTasks=tasks.filter(t=>t.status==='Blocked').length;
+  const inProgressTasks=tasks.filter(t=>t.status==='In Progress').length;
+  const generalProgress=totalTasks>0?Math.round((tasks.reduce((a,t)=>a+(t.progress||0),0)/(totalTasks*100))*100):0;
+
+  // ── Filtrado ──
+  const filteredTasks=tasks.filter(t=>{
+    if(filterAssignee!=='Todos'&&t.assignee!==filterAssignee&&t.assignee!=='Ambos')return false;
+    if(filterBlock!=='Todos'&&t.block!==filterBlock)return false;
+    if(filterWeekOnly&&(t.start>currentWeek||t.end<currentWeek))return false;
+    if(searchTerm){
+      const q=searchTerm.toLowerCase();
+      return t.title.toLowerCase().includes(q)||t.block.toLowerCase().includes(q)||(t.assignee||'').toLowerCase().includes(q);
+    }
+    return true;
+  });
+  const uniqueBlocks=[...new Set(tasks.map(t=>t.block))].sort();
+
+  // ── DonutChart ──
+  const DonutChart=({items})=>{
+    const total=items.reduce((a,c)=>a+c.value,0);
+    let ang=0;
+    const grad=items.map(item=>{const pct=total>0?(item.value/total)*100:0;const seg=`${item.color} ${ang}% ${ang+pct}%`;ang+=pct;return seg;}).join(',');
+    return(
+      <div className="flex items-center gap-5">
+        <div className="w-28 h-28 rounded-full relative flex items-center justify-center shrink-0"
+          style={{background:total>0?`conic-gradient(${grad})`:'#1e293b'}}>
+          <div className={`rounded-full flex items-center justify-center font-bold text-sm ${darkMode?'bg-slate-900 text-white':'bg-white text-slate-800'}`}
+            style={{width:'4.5rem',height:'4.5rem'}}>{total}</div>
+        </div>
+        <div className="space-y-1.5 text-xs">
+          {items.map((it,i)=>(
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:it.color}}/>
+              <span className={darkMode?'text-slate-300':'text-slate-600'}>{it.label} ({it.value})</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const fbBadge={online:'bg-emerald-500',connecting:'bg-amber-400',error:'bg-red-500'};
+  const fbLabel={online:'Firebase • En vivo',connecting:'Conectando...',error:'Sin conexión'};
+
+  const notifColorMap={blue:'text-blue-400 bg-blue-900/20',emerald:'text-emerald-400 bg-emerald-900/20',red:'text-red-400 bg-red-900/20',indigo:'text-indigo-400 bg-indigo-900/20',amber:'text-amber-400 bg-amber-900/20',slate:'text-slate-400 bg-slate-800'};
+
+  return(
+    <div className={`min-h-screen flex flex-col md:flex-row transition-colors duration-300 ${darkMode?'bg-slate-950 text-slate-100':'bg-slate-50 text-slate-800'}`}>
+
+      {/* ═══ SIDEBAR ═══ */}
+      <nav className="w-full md:w-64 bg-[#0a2540] text-slate-200 flex flex-col shadow-xl z-20 shrink-0 border-r border-[#1a4473] md:h-screen overflow-y-auto">
+        <div className="p-6 flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-wider flex items-center gap-2">
+              <i className="fa-solid fa-chart-line text-blue-400"/> INDIMON
+            </h1>
+            <p className="text-xs text-blue-300 mt-1 uppercase tracking-widest font-semibold">Dpto. Calidad — V20</p>
+          </div>
+          <button onClick={()=>setDarkMode(!darkMode)} className="p-2 bg-[#113255] hover:bg-blue-800 rounded-lg text-blue-200 transition-colors">
+            <i className={`fa-solid ${darkMode?'fa-sun':'fa-moon'}`}/>
+          </button>
+        </div>
+
+        <div className="px-6 mb-4 space-y-2 border-b border-[#1a4473] pb-6">
+          <button onClick={()=>setShowAddModal(true)} className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-4 sm:py-2.5 rounded-xl sm:rounded-lg font-bold transition-colors text-base sm:text-sm shadow-lg shadow-indigo-900/30">
+            <i className="fa-solid fa-plus"/> Nueva Tarea
+          </button>
+          <button onClick={exportCSV} className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-4 sm:py-2.5 rounded-xl sm:rounded-lg font-bold transition-colors text-base sm:text-sm">
+            <i className="fa-solid fa-file-csv"/> Exportar CSV
+          </button>
+          <button onClick={downloadReport} className="w-full flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-600 text-white px-4 py-2.5 rounded-lg font-bold transition-colors text-sm">
+            <i className="fa-solid fa-file-arrow-down"/> Informe Gerencial
+          </button>
+          <button onClick={resetDemo} disabled={isLoadingDemo} className="w-full flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-lg font-bold transition-colors text-sm disabled:opacity-60">
+            {isLoadingDemo?<i className="fa-solid fa-circle-notch fa-spin"/>:<i className="fa-solid fa-rotate-left"/>} Reiniciar Tareas
+          </button>
+
+        </div>
+
+        <div className="flex md:flex-col overflow-x-auto md:overflow-visible flex-nowrap py-2 md:py-2 touch-pan-x md:touch-auto">
+          {[
+            {id:'kanban',icon:'fa-table-columns',label:'Tablero Kanban'},
+            {id:'calendar',icon:'fa-calendar-days',label:'Calendario'},
+            {id:'kpis',icon:'fa-chart-pie',label:'Dashboard KPIs'},
+            {id:'analitica',icon:'fa-chart-mixed',label:'Analítica Avanzada'},
+            {id:'riesgos',icon:'fa-triangle-exclamation',label:'Riesgos'},
+            {id:'activity',icon:'fa-clock-rotate-left',label:'Historial'},
+          ].map(tab=>(
+            <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+              className={`flex-shrink-0 md:w-full flex items-center gap-3 px-6 py-4 md:py-3 transition-colors text-sm whitespace-nowrap ${activeTab===tab.id?'bg-blue-600 text-white border-b-4 md:border-b-0 md:border-r-4 border-blue-400 font-bold':'hover:bg-[#113255] font-medium'}`}>
+              <i className={`fa-solid ${tab.icon} w-4 text-center`}/> {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="px-3 pb-3 no-print">
+          <div className={`rounded-xl border overflow-hidden ${darkMode?'bg-[#113255] border-[#1a4473]':'bg-slate-100 border-slate-200'}`}>
+            <button onClick={()=>setShowEmailConfig(v=>!v)}
+              className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold transition-colors hover:opacity-80">
+              <span className="flex items-center gap-2 text-slate-300"><i className="fa-solid fa-envelope text-blue-400"/> Destinatarios de Alertas</span>
+              <span className="flex items-center gap-1.5">
+                <span className="bg-blue-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">{emailList.length}</span>
+                <i className={`fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform ${showEmailConfig?'rotate-180':''}`}/>
+              </span>
+            </button>
+            {showEmailConfig&&(
+              <div className={`px-3 pb-3 border-t ${darkMode?'border-[#1a4473]':'border-slate-200'}`}>
+                <div className="space-y-1 mt-2 mb-2 max-h-28 overflow-y-auto">
+                  {emailList.map((em,i)=>(
+                    <div key={i} className="flex items-center gap-1.5 group">
+                      <span className="flex-1 text-[10px] text-slate-300 truncate font-mono">{em}</span>
+                      <button onClick={()=>{const nl=emailList.filter((_,j)=>j!==i);setEmailList(nl);localStorage.setItem('indimon_emails',JSON.stringify(nl));}}
+                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all">
+                        <i className="fa-solid fa-xmark text-[10px]"/>
+                      </button>
+                    </div>
+                  ))}
+                  {emailList.length===0&&<p className="text-[10px] text-slate-600 italic">Sin destinatarios</p>}
+                </div>
+                <div className="flex gap-1">
+                  <input type="email" value={newEmailInput} onChange={e=>setNewEmailInput(e.target.value)}
+                    onKeyDown={e=>{if(e.key==='Enter'&&newEmailInput.includes('@')){const nl=[...emailList,newEmailInput.trim()];setEmailList(nl);localStorage.setItem('indimon_emails',JSON.stringify(nl));setNewEmailInput('');}}}
+                    placeholder="correo@empresa.com"
+                    className={`flex-1 text-[10px] px-2 py-1 rounded-lg border outline-none ${darkMode?'bg-slate-900 border-slate-700 text-white placeholder-slate-600':'bg-white border-slate-300'}`}/>
+                  <button onClick={()=>{if(!newEmailInput.includes('@'))return;const nl=[...emailList,newEmailInput.trim()];setEmailList(nl);localStorage.setItem('indimon_emails',JSON.stringify(nl));setNewEmailInput('');}}
+                    className="px-2 py-1 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-[10px] font-bold transition-colors">
+                    <i className="fa-solid fa-plus"/>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 m-3 bg-[#113255] rounded-xl border border-[#1a4473] text-xs text-slate-300 no-print">
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${fbBadge[fbStatus]} ${fbStatus==='connecting'?'animate-pulse':''}`}/>
+            <span className="font-bold text-white">{fbLabel[fbStatus]}</span>
+          </div>
+          <p className="text-slate-400 text-[11px]">Sincronización en tiempo real.</p>
+        </div>
+      </nav>
+
+      {/* ═══ MAIN ═══ */}
+      <main className="flex-1 flex flex-col h-[100dvh] sm:h-screen overflow-hidden">
+
+        {/* Header */}
+        <header className={`px-6 py-4 border-b flex flex-wrap gap-3 justify-between items-center shrink-0 z-10 ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+          <div>
+            <h2 className="text-xl font-bold">
+              {activeTab==='kanban'?'Tablero Kanban':activeTab==='calendar'?'Calendario de 10 Semanas':activeTab==='kpis'?'Indicadores KPI':activeTab==='analitica'?'Analítica Avanzada & Forecast':activeTab==='riesgos'?'Dashboard de Riesgos':'Historial de Actividad'}
+            </h2>
+            <p className={`text-xs flex items-center gap-1.5 mt-0.5 ${fbStatus==='online'?'text-emerald-500':fbStatus==='error'?'text-red-400':'text-amber-400'}`}>
+              <i className="fa-solid fa-database text-[10px]"/>
+              {fbStatus==='online'?`Conectado — ${totalTasks} tareas`:fbStatus==='error'?'Error de conexión':'Conectando a Firebase...'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Buscador global */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-200'}`}>
+              <i className="fa-solid fa-magnifying-glass text-slate-400 text-xs"/>
+              <input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Buscar tarea..."
+                className="bg-transparent outline-none w-32 text-sm placeholder-slate-500"/>
+              {searchTerm&&<button onClick={()=>setSearchTerm('')} className="text-slate-500 hover:text-slate-300 text-xs"><i className="fa-solid fa-xmark"/></button>}
+            </div>
+
+            {/* Semana */}
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${darkMode?'bg-blue-900/20 border-blue-800/50':'bg-blue-50 border-blue-100'}`}>
+              <i className="fa-regular fa-calendar text-blue-500 text-sm"/>
+              <span className={`text-xs font-bold ${darkMode?'text-blue-300':'text-blue-800'}`}>Sem:</span>
+              <select value={currentWeek} onChange={e=>setCurrentWeek(Number(e.target.value))}
+                className="bg-transparent font-bold text-blue-500 outline-none cursor-pointer text-sm">
+                {[1,2,3,4,5,6,7,8,9,10].map(w=><option key={w} value={w} className="bg-slate-900">S{w}</option>)}
+              </select>
+            </div>
+
+            {/* Progreso */}
+            <div className="flex flex-col items-end">
+              <span className={`text-[10px] font-bold uppercase tracking-wide ${darkMode?'text-slate-400':'text-slate-500'}`}>Global</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className={`w-24 h-2 rounded-full overflow-hidden ${darkMode?'bg-slate-800':'bg-slate-200'}`}>
+                  <div className="h-full bg-blue-600 rounded-full transition-all duration-700" style={{width:`${generalProgress}%`}}/>
+                </div>
+                <span className="text-sm font-bold">{generalProgress}%</span>
+              </div>
+            </div>
+
+            {/* Campana notificaciones */}
+            <div className="relative" ref={notifsRef}>
+              <button onClick={()=>{setShowNotifs(v=>!v);if(!showNotifs)markAllRead();}}
+                className={`relative p-2.5 rounded-xl border transition-colors ${darkMode?'bg-slate-800 border-slate-700 hover:bg-slate-700':'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                <i className={`fa-solid fa-bell text-base ${unread>0?'text-amber-400':'text-slate-400'}`}/>
+                {unread>0&&(
+                  <span className="badge-pop absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-lg">
+                    {unread>9?'9+':unread}
+                  </span>
+                )}
+              </button>
+
+              {/* Panel notificaciones */}
+              {showNotifs&&(
+                <div className={`absolute right-0 top-12 w-80 rounded-2xl shadow-2xl border z-50 overflow-hidden ${darkMode?'bg-slate-900 border-slate-700':'bg-white border-slate-200'}`}>
+                  <div className={`flex items-center justify-between px-4 py-3 border-b ${darkMode?'border-slate-700':'border-slate-100'}`}>
+                    <h3 className="font-bold text-sm flex items-center gap-2"><i className="fa-solid fa-bell text-amber-400"/> Notificaciones</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${darkMode?'bg-slate-800 text-slate-400':'bg-slate-100 text-slate-500'}`}>{notifications.length}</span>
+                      {notifications.length>0&&(
+                        <button onClick={()=>notifsCol().get().then(s=>s.docs.forEach(d=>d.ref.delete()))}
+                          className="text-[10px] text-slate-500 hover:text-red-400 transition-colors font-bold">Limpiar</button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto max-h-72">
+                    {notifications.length===0
+                      ?<div className="flex flex-col items-center justify-center py-10 opacity-40">
+                          <i className="fa-regular fa-bell-slash text-3xl mb-2"/>
+                          <p className="text-xs">Sin notificaciones</p>
+                        </div>
+                      :notifications.map((n,i)=>{
+                          const col=notifColorMap[n.color]||notifColorMap.blue;
+                          return(
+                            <div key={n.id||i} className={`notif-item flex gap-3 px-4 py-3 border-b ${darkMode?'border-slate-800 hover:bg-slate-800/40':'border-slate-50 hover:bg-slate-50'} transition-colors`}
+                              style={{animationDelay:`${i*0.03}s`}}>
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${col}`}>
+                                <i className={`fa-solid ${n.icon||'fa-circle-dot'} text-xs`}/>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs font-bold truncate ${darkMode?'text-slate-200':'text-slate-800'}`}>{n.title}</p>
+                                <p className={`text-[11px] mt-0.5 line-clamp-2 ${darkMode?'text-slate-400':'text-slate-500'}`}>{n.body}</p>
+                                <p className={`text-[10px] mt-1 ${darkMode?'text-slate-600':'text-slate-400'}`}>{fmtDate(n.ts)}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                    }
+                  </div>
+                  {notifications.length>0&&(
+                    <div className={`px-4 py-2 text-center border-t ${darkMode?'border-slate-700':'border-slate-100'}`}>
+                      <button onClick={()=>{setShowNotifs(false);setActiveTab('activity');}} className="text-xs text-blue-400 hover:underline font-bold">
+                        Ver historial completo →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Content */}
+        <div className={`flex-1 overflow-auto p-6 lg:p-8 relative ${darkMode?'bg-slate-950':'bg-slate-50/50'}`}>
+
+          {toast&&(
+            <div className="fixed top-4 right-4 bg-slate-800 text-white px-4 py-3 rounded-xl shadow-2xl z-50 flex items-center gap-2 font-medium border border-slate-700 text-sm">
+              {toast}
+            </div>
+          )}
+
+          {/* ══ KANBAN ══ */}
+          {activeTab==='kanban'&&(
+            <div className="flex flex-col h-full">
+              {tasks.length===0&&(
+                <div className={`mb-6 p-8 rounded-2xl border text-center ${darkMode?'bg-slate-900 border-slate-700':'bg-white border-slate-200'}`}>
+                  <i className="fa-solid fa-database text-5xl text-blue-500 mb-4 block"/>
+                  <h3 className="text-xl font-bold mb-2">Base de Datos Vacía</h3>
+                  <p className={`mb-5 text-sm ${darkMode?'text-slate-400':'text-slate-500'}`}>Crea tareas manualmente o carga las de demostración para empezar.</p>
+                  <button onClick={loadDemo} disabled={isLoadingDemo}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center gap-2 mx-auto disabled:opacity-60 text-sm">
+                    {isLoadingDemo?<i className="fa-solid fa-circle-notch fa-spin"/>:<i className="fa-solid fa-download"/>}
+                    Cargar Tareas de Demostración
+                  </button>
+                </div>
+              )}
+
+              {/* Barra filtros */}
+              <div className="mb-5 flex gap-2 flex-wrap shrink-0 no-print items-center">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs ${darkMode?'bg-slate-900 border-slate-700':'bg-white border-slate-200'}`}>
+                  <i className="fa-solid fa-filter text-slate-400"/> <span className="font-semibold text-slate-500">Filtros:</span>
+                </div>
+                {['Todos','Inspector','Aprendiz'].map(f=>(
+                  <button key={f} onClick={()=>setFilterAssignee(f)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filterAssignee===f?'bg-blue-600 text-white':darkMode?'bg-slate-800 text-slate-400 hover:bg-slate-700':'bg-white text-slate-600 border hover:bg-slate-50'}`}>
+                    {f}
+                  </button>
+                ))}
+                {/* Filtro por Bloque */}
+                {uniqueBlocks.length>0&&(
+                  <select value={filterBlock} onChange={e=>setFilterBlock(e.target.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors ${filterBlock!=='Todos'?'bg-purple-600 text-white border-purple-600':darkMode?'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700':'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                    <option value="Todos">Todos los bloques</option>
+                    {uniqueBlocks.map(b=><option key={b} value={b} className="bg-slate-900 text-slate-100">{b}</option>)}
+                  </select>
+                )}
+                <button onClick={()=>setFilterWeekOnly(v=>!v)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${filterWeekOnly?'bg-amber-500 text-white':'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
+                  <i className="fa-regular fa-calendar"/> Solo semana {currentWeek}
+                </button>
+                {(searchTerm||filterWeekOnly||filterAssignee!=='Todos'||filterBlock!=='Todos')&&(
+                  <button onClick={()=>{setSearchTerm('');setFilterWeekOnly(false);setFilterAssignee('Todos');setFilterBlock('Todos');}}
+                    className="text-[10px] font-bold text-red-400 bg-red-900/20 hover:bg-red-900/40 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                    <i className="fa-solid fa-xmark"/> Limpiar
+                  </button>
+                )}
+                {(searchTerm||filterWeekOnly||filterAssignee!=='Todos'||filterBlock!=='Todos')&&(
+                  <span className={`text-xs px-2 py-1 rounded-full ${darkMode?'bg-slate-800 text-slate-400':'bg-slate-100 text-slate-500'}`}>
+                    {filteredTasks.length} resultado{filteredTasks.length!==1?'s':''}
+                  </span>
+                )}
+              </div>
+
+              {/* Alerta bloqueadas */}
+              {blockedTasks>0&&(
+                <div className={`mb-5 p-4 rounded-xl border shrink-0 ${darkMode?'bg-red-950/30 border-red-900/50':'bg-red-50 border-red-200'}`}>
+                  <p className={`font-bold flex items-center gap-2 mb-3 text-sm ${darkMode?'text-red-400':'text-red-700'}`}>
+                    <i className="fa-solid fa-triangle-exclamation"/> {blockedTasks} tarea{blockedTasks!==1?'s':''} bloqueada{blockedTasks!==1?'s':''}
+                  </p>
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    {tasks.filter(t=>t.status==='Blocked').map(task=>(
+                      <div key={task.id} className={`p-4 rounded-xl border flex flex-col gap-3 min-w-[240px] max-w-[280px] ${darkMode?'bg-slate-900 border-red-900/50':'bg-white border-red-100 shadow-sm'}`}>
+                        <div>
+                          <h4 className={`font-bold text-xs truncate mb-1 ${darkMode?'text-white':'text-slate-800'}`}>{task.title}</h4>
+                          <p className={`text-[11px] flex items-start gap-1 line-clamp-2 ${darkMode?'text-red-300':'text-red-600'}`}>
+                            <i className="fa-solid fa-lock text-[9px] mt-0.5 shrink-0"/> {task.blockReason||'Sin motivo registrado'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={()=>moveTask(task.id,'In Progress')}
+                            className="flex-1 text-[10px] font-bold px-2 py-1.5 rounded-lg flex items-center justify-center gap-1 bg-blue-900/30 text-blue-400 hover:bg-blue-800/50 transition-colors">
+                            <i className="fa-solid fa-lock-open"/> Desbloquear
+                          </button>
+                          <button onClick={()=>setEditTask(task)}
+                            className="text-[10px] font-bold px-2 py-1.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
+                            <i className="fa-solid fa-pen"/>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Columnas Kanban */}
+              <div className="flex gap-5 overflow-x-auto pb-6 items-start snap-x flex-1">
+                {['To Do','In Progress','Blocked','Done'].map(col=>(
+                  <div key={col} className={`w-[300px] lg:w-[320px] shrink-0 flex flex-col rounded-2xl p-4 border min-h-[500px] snap-start ${darkMode?'bg-slate-900/50 border-slate-800':'bg-slate-100/80 border-slate-200'}`}>
+                    <div className="flex items-center justify-between mb-4 px-1">
+                      <h3 className={`font-bold text-sm flex items-center gap-2 ${col==='Blocked'?'text-red-400':''}`}>
+                        <i className={`fa-solid ${STATUS_ICON[col]} text-xs ${STATUS_COLOR[col]}`}/>
+                        {col==='To Do'?'Pendientes':col==='In Progress'?'En Progreso':col==='Blocked'?'Bloqueadas':'Completadas'}
+                      </h3>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${darkMode?'bg-slate-800 text-slate-300':'bg-white text-slate-600 shadow-sm'}`}>
+                        {filteredTasks.filter(t=>t.status===col).length}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 overflow-y-auto pr-1 pb-2 flex-1">
+                      {filteredTasks.filter(t=>t.status===col).length===0&&(
+                        <div className="flex flex-col items-center justify-center py-12 opacity-25">
+                          <i className={`fa-solid ${STATUS_ICON[col]} text-3xl mb-2`}/>
+                          <p className="text-xs">Sin tareas</p>
+                        </div>
+                      )}
+                      {filteredTasks.filter(t=>t.status===col).map(task=>{
+                        const overdue=currentWeek>task.end&&task.status!=='Done';
+                        return(
+                          <div key={task.id} className={`rounded-xl p-4 border transition-all relative overflow-hidden
+                            ${task.status==='Blocked'?(darkMode?'bg-red-950/30 border-red-900':'bg-red-50 border-red-200'):(darkMode?'bg-slate-800 border-slate-700':'bg-white border-slate-200')}
+                            ${overdue&&task.status!=='Blocked'?'ring-1 ring-orange-500/60':''}`}>
+
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex gap-1.5 items-center flex-wrap">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${darkMode?'bg-slate-700/80 text-slate-300':'bg-slate-100 text-slate-600'}`}>{task.block}</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${task.priority==='Alta'?'text-red-400 bg-red-900/20':task.priority==='Media'?'text-yellow-400 bg-yellow-900/20':'text-green-400 bg-green-900/20'}`}>
+                                  {task.priority}
+                                </span>
+                              </div>
+                              <div className="flex gap-1">
+                                <button onClick={()=>setEditTask({...task})} className="text-slate-500 hover:text-blue-400 transition-colors p-2 sm:p-1 rounded-lg touch-manipulation" title="Editar">
+                                  <i className="fa-solid fa-pen text-[11px]"/>
+                                </button>
+                                <button
+                                  onClick={()=>{
+                                    if(!confirm(`¿Reiniciar "${task.title}" al estado inicial?\n\nSe resetearán: estado, progreso, tiempo y subtareas completadas.`))return;
+                                    dbUpdate(task.id,{
+                                      status:'To Do',
+                                      progress:0,
+                                      subtasks:(task.subtasks||[]).map(s=>({...s,done:false})),
+                                      taskNote:'',
+                                      blockReason:''
+                                    });
+                                    showToast('🔄 Tarea reiniciada');
+                                  }}
+                                  className="text-slate-500 hover:text-amber-400 transition-colors p-1"
+                                  title="Reiniciar esta tarea">
+                                  <i className="fa-solid fa-rotate-left text-[11px]"/>
+                                </button>
+                                <button onClick={()=>dbDelete(task.id)} className="text-slate-500 hover:text-red-400 transition-colors p-2 sm:p-1 rounded-lg touch-manipulation" title="Eliminar">
+                                  <i className="fa-solid fa-trash-can text-[11px]"/>
+                                </button>
+                              </div>
+                            </div>
+
+                            <h4 className={`font-bold text-base sm:text-sm mb-1 leading-snug ${task.status==='Blocked'?'text-red-400':(darkMode?'text-white':'text-slate-800')}`}>{task.title}</h4>
+                            <div className="flex items-center justify-between mb-3 mt-2">
+                              <div className="flex items-center gap-1.5">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${task.assignee==='Inspector'?'bg-blue-900/50 text-blue-300':task.assignee==='Aprendiz'?'bg-emerald-900/50 text-emerald-300':'bg-purple-900/50 text-purple-300'}`}>
+                                  {task.assignee.charAt(0)}
+                                </div>
+                                <span className={`text-xs ${darkMode?'text-slate-300':'text-slate-600'}`}>{task.assignee}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {overdue&&<span className="text-[9px] text-orange-400 font-bold bg-orange-900/20 px-1.5 py-0.5 rounded">VENCIDA</span>}
+                                {(task.taskNote&&task.taskNote.trim())&&(
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 ${darkMode?'bg-slate-700/70 text-slate-400':'bg-slate-100 text-slate-500'}`}>
+                                    <i className="fa-solid fa-note-sticky text-[8px]"/> nota
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Subtareas acordeón */}
+                            <div className="mb-3">
+                              <button onClick={()=>setExpandedTask(expandedTask===task.id?null:task.id)}
+                                className={`w-full flex items-center justify-between text-[11px] font-bold p-2 rounded-lg transition-colors ${darkMode?'bg-slate-700/40 hover:bg-slate-700/70 text-slate-400':'bg-slate-50 hover:bg-slate-100 text-slate-500'}`}>
+                                <span className="flex items-center gap-1.5">
+                                  <i className="fa-solid fa-list-check text-[10px]"/> Subtareas
+                                  {(task.subtasks||[]).length>0&&<span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${darkMode?'bg-slate-600 text-slate-300':'bg-slate-200 text-slate-600'}`}>{(task.subtasks||[]).filter(s=>s.done).length}/{(task.subtasks||[]).length}</span>}
+                                </span>
+                                <i className={`fa-solid fa-chevron-right text-[10px] transition-transform ${expandedTask===task.id?'rotate-90':''}`}/>
+                              </button>
+                              {expandedTask===task.id&&(
+                                <div className={`mt-2 p-3 rounded-xl border space-y-3 text-xs ${darkMode?'bg-slate-900 border-slate-700':'bg-white border-slate-100'}`}>
+                                  <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                      <span className={`text-[10px] font-bold uppercase ${darkMode?'text-slate-500':'text-slate-400'}`}>Checklist</span>
+                                      <button onClick={()=>genSubtasks(task)} disabled={aiLoading[task.id]}
+                                        className={`text-[9px] font-bold px-2 py-1 rounded transition-colors flex items-center gap-1 ${darkMode?'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-900/60':'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}>
+                                        {aiLoading[task.id]?<i className="fa-solid fa-circle-notch fa-spin text-[9px]"/>:<><i className="fa-solid fa-wand-magic-sparkles text-[9px]"/>IA</>}
+                                      </button>
+                                    </div>
+                                    <div className="space-y-1.5 mb-2">
+                                      {(task.subtasks||[]).map(sub=>(
+                                        <div key={sub.id} className="flex items-start gap-2 group">
+                                          <input type="checkbox" checked={sub.done} onChange={()=>toggleSubtask(task,sub.id)} className="mt-0.5 accent-blue-500 shrink-0 cursor-pointer"/>
+                                          <span className={`flex-1 leading-snug cursor-pointer ${sub.done?'line-through text-slate-500':(darkMode?'text-slate-300':'text-slate-700')}`} onClick={()=>toggleSubtask(task,sub.id)}>{sub.text}</span>
+                                          <button
+                                            onClick={()=>deleteSubtask(task,sub.id)}
+                                            className="opacity-0 group-hover:opacity-100 shrink-0 text-slate-600 hover:text-red-400 transition-all p-0.5 rounded"
+                                            title="Eliminar subtarea">
+                                            <i className="fa-solid fa-xmark text-[10px]"/>
+                                          </button>
+                                        </div>
+                                      ))}
+                                      {!(task.subtasks||[]).length&&<p className="text-[10px] text-slate-600 italic">Sin subtareas — agrégalas manualmente o usa IA</p>}
+                                    </div>
+                                    {/* Input nueva subtarea manual */}
+                                    <div className="flex gap-1.5 mt-2">
+                                      <input
+                                        type="text"
+                                        value={newSubInputs[task.id]||''}
+                                        onChange={e=>setNewSubInputs(p=>({...p,[task.id]:e.target.value}))}
+                                        placeholder="✏️ Nueva subtarea..."
+                                        className={`flex-1 text-[10px] px-2 py-1.5 rounded-lg border ${darkMode?'bg-slate-800 border-slate-600 text-white placeholder-slate-500':'bg-white border-slate-300 text-slate-700'}`}
+                                        onKeyDown={e=>{
+                                          if(e.key==='Enter')addSubtask(task,newSubInputs[task.id]||'');
+                                        }}
+                                      />
+                                      <button
+                                        onClick={()=>addSubtask(task,newSubInputs[task.id]||'')}
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${darkMode?'bg-indigo-700 hover:bg-indigo-600 text-white':'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'}`}
+                                        title="Agregar subtarea">
+                                        <i className="fa-solid fa-plus"/>
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className={`pt-2 border-t ${darkMode?'border-slate-700':'border-slate-100'}`}>
+                                    <p className={`text-[10px] font-bold uppercase mb-2 ${darkMode?'text-slate-500':'text-slate-400'}`}><i className="fa-solid fa-paperclip mr-1"/>Evidencias</p>
+                                    {(task.attachments||[]).map(att=>(
+                                      <div key={att.id} className="flex items-center gap-1 group mb-1">
+                                        <a href={att.url} target="_blank" rel="noreferrer"
+                                          className="flex items-center gap-1 text-[11px] text-blue-400 hover:underline flex-1 min-w-0 truncate">
+                                          <i className="fa-solid fa-link text-[10px] shrink-0"/> {att.url}
+                                        </a>
+                                        <button
+                                          onClick={()=>dbUpdate(task.id,{attachments:(task.attachments||[]).filter(a=>a.id!==att.id)})}
+                                          className="opacity-0 group-hover:opacity-100 shrink-0 text-slate-600 hover:text-red-400 transition-all p-0.5 rounded"
+                                          title="Eliminar enlace">
+                                          <i className="fa-solid fa-xmark text-[10px]"/>
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <div className="flex gap-1.5 mt-2">
+                                      <input type="text" placeholder="https://..." value={newAttLink} onChange={e=>setNewAttLink(e.target.value)}
+                                        className={`flex-1 text-[10px] px-2 py-1.5 rounded-lg border ${darkMode?'bg-slate-800 border-slate-600 text-white':'bg-white border-slate-300'}`}/>
+                                      <button onClick={()=>addAttachment(task)} className={`px-2.5 py-1 rounded-lg text-xs ${darkMode?'bg-slate-700 hover:bg-slate-600 text-slate-300':'bg-slate-200 hover:bg-slate-300 text-slate-700'}`}>
+                                        <i className="fa-solid fa-plus"/>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Notas de tarea (solo In Progress) */}
+                            {col==='In Progress'&&(
+                              <div className={`mb-3 rounded-xl border ${darkMode?'bg-slate-900 border-slate-700':'bg-slate-50 border-slate-100'}`}>
+                                <button
+                                  onClick={()=>setNotesCollapsed(p=>({...p,[task.id]:!p[task.id]}))}
+                                  className={`w-full flex items-center justify-between px-3 py-2 text-[11px] font-bold transition-colors rounded-xl ${darkMode?'hover:bg-slate-800/50':'hover:bg-slate-100'}`}>
+                                  <span className={`flex items-center gap-1.5 ${darkMode?'text-slate-400':'text-slate-500'}`}>
+                                    <i className="fa-solid fa-note-sticky text-[9px] text-amber-400"/> Novedades
+                                    {(task.taskNote&&task.taskNote.trim())&&<span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"/>}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`font-bold text-xs font-mono px-2 py-0.5 rounded-lg ${darkMode?'bg-blue-900/40 text-blue-300':'bg-blue-100 text-blue-700'}`}>{task.progress||0}%</span>
+                                    <i className={`fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform ${notesCollapsed[task.id]?'':'rotate-180'}`}/>
+                                  </div>
+                                </button>
+                                {!notesCollapsed[task.id]&&(
+                                  <div className="px-3 pb-3">
+                                    <textarea
+                                      rows="2"
+                                      value={noteInputs[task.id]!==undefined?noteInputs[task.id]:(task.taskNote||'')}
+                                      onChange={e=>setNoteInputs(p=>({...p,[task.id]:e.target.value}))}
+                                      onBlur={e=>saveNote(task,e.target.value)}
+                                      placeholder="📋 Observaciones, bloqueos, avances..."
+                                      className={`w-full text-[11px] px-2 py-1.5 rounded-lg border resize-none outline-none focus:ring-1 focus:ring-amber-500/40 ${darkMode?'bg-slate-800 border-slate-600 text-slate-200 placeholder-slate-600':'bg-white border-slate-300 text-slate-700 placeholder-slate-400'}`}
+                                    />
+                                    <div className="flex items-center gap-2 mt-2">
+                                      <button onClick={()=>stepProgress(task,-5)} className={`w-6 h-6 flex items-center justify-center border rounded-full shrink-0 text-xs transition-colors ${darkMode?'bg-slate-800 border-slate-600 hover:bg-slate-700':'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                                        <i className="fa-solid fa-minus text-[9px]"/>
+                                      </button>
+                                      <div className={`flex-1 h-2 rounded-full overflow-hidden ${darkMode?'bg-slate-700':'bg-slate-200'}`}>
+                                        <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all" style={{width:`${task.progress||0}%`}}/>
+                                      </div>
+                                      <button onClick={()=>stepProgress(task,5)} className={`w-6 h-6 flex items-center justify-center border rounded-full shrink-0 text-xs transition-colors ${darkMode?'bg-slate-800 border-slate-600 hover:bg-slate-700':'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                                        <i className="fa-solid fa-plus text-[9px]"/>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Footer */}
+                            <div className={`flex items-center justify-between pt-3 border-t ${darkMode?'border-slate-700/60':'border-slate-100'}`}>
+                              {col==='To Do'&&<button onClick={()=>moveTask(task.id,'In Progress')} className="text-[11px] font-bold text-blue-400 bg-blue-900/20 hover:bg-blue-900/40 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"><i className="fa-solid fa-play text-[10px]"/>Iniciar</button>}
+                              {col==='In Progress'&&(
+                                <div className="flex gap-2 w-full justify-between">
+                                  <button onClick={()=>{setBlockingId(task.id);setBlockReason('');}} className="text-[10px] font-bold text-red-400 bg-red-900/20 hover:bg-red-900/40 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors"><i className="fa-solid fa-lock text-[9px]"/>Bloquear</button>
+                                  <button onClick={()=>moveTask(task.id,'Done')} className="text-[10px] font-bold text-emerald-400 bg-emerald-900/20 hover:bg-emerald-900/40 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors"><i className="fa-solid fa-check text-[9px]"/>Terminar</button>
+                                </div>
+                              )}
+                              {col==='Blocked'&&<button onClick={()=>moveTask(task.id,'In Progress')} className="text-[11px] font-bold text-blue-400 bg-blue-900/20 hover:bg-blue-900/40 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"><i className="fa-solid fa-lock-open text-[10px]"/>Desbloquear</button>}
+                              {col==='Done'&&<span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1"><i className="fa-solid fa-circle-check"/>Finalizado</span>}
+                              <span className={`text-[10px] ${darkMode?'text-slate-600':'text-slate-400'}`}>S{task.start}–S{task.end}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ══ CALENDARIO ══ */}
+          {activeTab==='calendar'&&(
+            <div className={`p-6 rounded-2xl shadow-sm border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                {[1,2,3,4,5,6,7,8,9,10].map(week=>{
+                  const wt=tasks.filter(t=>t.start<=week&&t.end>=week);
+                  const done=wt.filter(t=>t.status==='Done').length;
+                  const blocked=wt.filter(t=>t.status==='Blocked').length;
+                  return(
+                    <div key={week} className={`p-4 rounded-xl border flex flex-col ${week===currentWeek?(darkMode?'bg-blue-900/20 border-blue-500/50 ring-1 ring-blue-500':'bg-blue-50 border-blue-300 ring-1 ring-blue-300'):(darkMode?'bg-slate-800/50 border-slate-700':'bg-slate-50 border-slate-200')}`}>
+                      <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-700">
+                        <h4 className={`font-black text-base ${week===currentWeek?'text-blue-400':(darkMode?'text-slate-300':'text-slate-700')}`}>SEM {week}</h4>
+                        <div className="flex gap-1">
+                          {blocked>0&&<span className="text-[9px] font-black bg-red-900/40 text-red-400 px-1.5 py-0.5 rounded-full">{blocked}🛑</span>}
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${darkMode?'bg-slate-700 text-slate-300':'bg-slate-200 text-slate-600'}`}>{done}/{wt.length}</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-1.5 overflow-y-auto max-h-64">
+                        {wt.length===0&&<p className="text-[11px] text-slate-600 italic text-center py-4">Libre</p>}
+                        {wt.map(t=>(
+                          <div key={t.id} className={`p-2 rounded-lg border text-[11px] ${t.status==='Done'?(darkMode?'bg-emerald-900/20 border-emerald-800/50 text-emerald-300':'bg-emerald-50 border-emerald-200 text-emerald-700'):t.status==='Blocked'?(darkMode?'bg-red-900/20 border-red-800/50 text-red-300':'bg-red-50 border-red-200 text-red-700'):(darkMode?'bg-slate-800 border-slate-700':'bg-white border-slate-200')}`}>
+                            <div className="font-semibold truncate mb-0.5">{t.title}</div>
+                            <div className="flex justify-between items-center">
+                              <span className="opacity-60 text-[10px]">{t.assignee}</span>
+                              <span className="font-bold text-[10px]">{t.status==='Done'?'✅':t.status==='Blocked'?'🛑':`${t.progress||0}%`}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ══ KPIs ══ */}
+          {activeTab==='kpis'&&(()=>{
+            const todoCount=tasks.filter(t=>t.status==='To Do').length;
+            const efficiencyRate=totalTasks>0?Math.round(((completedTasks+inProgressTasks*0.5)/totalTasks)*100):0;
+            const blockRate=totalTasks>0?Math.round((blockedTasks/totalTasks)*100):0;
+            const blocks=[...new Set(tasks.map(t=>t.block))];
+            const notedTasks=tasks.filter(t=>t.taskNote&&t.taskNote.trim()).length;
+            const blockStats=blocks.map(b=>{
+              const bt=tasks.filter(t=>t.block===b);
+              return{name:b,total:bt.length,done:bt.filter(t=>t.status==='Done').length,blocked:bt.filter(t=>t.status==='Blocked').length,progress:bt.length>0?Math.round(bt.reduce((a,t)=>a+(t.progress||0),0)/bt.length):0};
+            });
+            const normaDist=[{name:'ISO 9001',color:'#3b82f6'},{name:'ASME Sec. IX',color:'#8b5cf6'},{name:'HSE',color:'#f59e0b'},{name:'General',color:'#06b6d4'}].map(n=>({
+              ...n,
+              count:tasks.filter(t=>(t.tag||t.block||'').includes(n.name.split(' ')[0])||n.name==='General').length,
+              done:tasks.filter(t=>((t.tag||t.block||'').includes(n.name.split(' ')[0])||n.name==='General')&&t.status==='Done').length
+            }));
+            const GaugeChart=({value})=>{
+              const r=44,cx=60,cy=60,circ=2*Math.PI*r,arc=circ*.75;
+              const offset=arc-(arc*Math.min(value,100)/100);
+              const color=value>=75?'#22c55e':value>=40?'#f59e0b':'#ef4444';
+              return(<svg width="160" height="136" viewBox="0 0 120 100">
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke={darkMode?'#1e293b':'#f1f5f9'} strokeWidth="10" strokeDasharray={`${arc} ${circ-arc}`} strokeDashoffset={circ*.125} strokeLinecap="round"/>
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="10" strokeDasharray={`${arc-offset} ${circ-(arc-offset)}`} strokeDashoffset={circ*.125} strokeLinecap="round" style={{transition:'stroke-dasharray 1.2s cubic-bezier(.4,0,.2,1)'}}/>
+                <text x={cx} y={cy+7} textAnchor="middle" fontSize="20" fontWeight="800" fill={darkMode?'#f1f5f9':'#0f172a'} fontFamily="monospace">{value}%</text>
+              </svg>);
+            };
+            const Sparkline=({end,color='#3b82f6'})=>{
+              const steps=7,W=80,H=28;
+              const data=Array.from({length:steps},(_,i)=>Math.round((end/steps)*(i+1)*(0.8+Math.random()*.4)));
+              const max=Math.max(...data,1);
+              const pts=data.map((v,i)=>`${(i/(steps-1))*W},${H-(v/max)*H}`).join(' ');
+              return(<svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}><polyline points={pts} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>);
+            };
+            return(<div className="space-y-5">
+              {/* Hero cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  {label:'Cumplimiento',val:`${generalProgress}%`,sub:'Progreso promedio',color:generalProgress>=75?'text-emerald-500':generalProgress>=40?'text-amber-500':'text-blue-500',glow:'#3b82f6',spark:<Sparkline end={generalProgress} color={generalProgress>=75?'#22c55e':'#3b82f6'}/>,bar:true},
+                  {label:'Completadas',val:completedTasks,sub:`de ${totalTasks} tareas`,color:'text-emerald-500',glow:'#22c55e',icon:'fa-circle-check',iconColor:'text-emerald-500',extra:`${totalTasks>0?Math.round(completedTasks/totalTasks*100):0}% finalización`},
+                  {label:'En Progreso',val:inProgressTasks,sub:'activas ahora',color:'text-amber-500',glow:'#f59e0b',pulse:true,extra:`Semana ${currentWeek}`},
+                  {label:'Bloqueadas',val:blockedTasks,sub:`${blockRate}% del total`,color:blockedTasks>0?'text-red-500':'text-slate-500',glow:'#ef4444',ring:blockedTasks>0,extra:blockedTasks>0?'Requieren atención':'Sin bloqueos'},
+                ].map((k,i)=>(
+                  <div key={i} className={`kpi-card p-5 rounded-2xl border shadow-sm relative overflow-hidden ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'} ${k.ring?'ring-1 ring-red-500/30':''}`}>
+                    <div className="absolute top-0 right-0 w-20 h-20 rounded-full blur-3xl opacity-10" style={{background:k.glow,transform:'translate(30%,-30%)'}}/>
+                    <p className={`text-[11px] font-bold uppercase tracking-widest mb-2 ${darkMode?'text-slate-500':'text-slate-400'}`}>{k.label}</p>
+                    <div className="flex items-end justify-between mb-1">
+                      <span className={`text-4xl font-black font-mono ${k.color}`}>{k.val}</span>
+                      {k.spark}
+                    </div>
+                    <p className={`text-[11px] ${darkMode?'text-slate-500':'text-slate-400'}`}>{k.sub}</p>
+                    {k.bar&&<div className={`mt-2 h-1.5 rounded-full overflow-hidden ${darkMode?'bg-slate-800':'bg-slate-100'}`}><div className="h-full rounded-full transition-all duration-1000" style={{width:`${generalProgress}%`,background:'linear-gradient(90deg,#3b82f6,#6366f1)'}}/></div>}
+                    {k.extra&&<p className={`text-[10px] mt-2 ${k.ring?'text-red-400':(darkMode?'text-slate-500':'text-slate-400')}`}><span className={`${k.pulse?'inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1 mb-0.5':''}${k.icon?`fa-solid ${k.icon} ${k.iconColor} mr-1 fa-xs`:''}`}/>{k.extra}</p>}
+                  </div>
+                ))}
+              </div>
+
+              {/* Gauge + Donut + IA */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div className={`kpi-card p-6 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                  <h3 className={`text-xs font-bold uppercase tracking-widest mb-4 ${darkMode?'text-slate-400':'text-slate-500'}`}>Salud del Proyecto</h3>
+                  <div className="flex justify-center"><GaugeChart value={generalProgress}/></div>
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    {[{l:'Crítico',r:'0–39',c:'text-red-500',b:darkMode?'bg-red-900/20':'bg-red-50',a:generalProgress<40},{l:'Regular',r:'40–74',c:'text-amber-500',b:darkMode?'bg-amber-900/20':'bg-amber-50',a:generalProgress>=40&&generalProgress<75},{l:'Óptimo',r:'75–100',c:'text-emerald-500',b:darkMode?'bg-emerald-900/20':'bg-emerald-50',a:generalProgress>=75}].map((s,i)=>(
+                      <div key={i} className={`p-2 rounded-lg ${s.b} ${s.a?'ring-1 ring-current':''}`}>
+                        <p className={`text-[10px] font-black ${s.c}`}>{s.l}</p>
+                        <p className={`text-[9px] ${darkMode?'text-slate-600':'text-slate-400'}`}>{s.r}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={`kpi-card p-6 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                  <h3 className={`text-xs font-bold uppercase tracking-widest mb-4 ${darkMode?'text-slate-400':'text-slate-500'}`}>Distribución</h3>
+                  <div className="space-y-4">
+                    <div><p className={`text-[10px] uppercase font-bold mb-2 ${darkMode?'text-slate-600':'text-slate-400'}`}>Responsable</p>
+                      <DonutChart items={[{label:'Inspector',value:tasks.filter(t=>t.assignee==='Inspector').length,color:'#3b82f6'},{label:'Aprendiz',value:tasks.filter(t=>t.assignee==='Aprendiz').length,color:'#10b981'},{label:'Ambos',value:tasks.filter(t=>t.assignee==='Ambos').length,color:'#8b5cf6'}]}/>
+                    </div>
+                    <div className={`pt-3 border-t ${darkMode?'border-slate-800':'border-slate-100'}`}><p className={`text-[10px] uppercase font-bold mb-2 ${darkMode?'text-slate-600':'text-slate-400'}`}>Estado</p>
+                      <DonutChart items={[{label:'Completadas',value:completedTasks,color:'#10b981'},{label:'En Progreso',value:inProgressTasks,color:'#3b82f6'},{label:'Bloqueadas',value:blockedTasks,color:'#ef4444'},{label:'Pendientes',value:todoCount,color:'#475569'}]}/>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`kpi-card p-6 rounded-2xl border flex flex-col ${darkMode?'bg-gradient-to-br from-indigo-950 to-slate-900 border-indigo-900/50':'bg-gradient-to-br from-indigo-50 to-white border-indigo-100'}`}>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className={`font-bold text-sm flex items-center gap-2 ${darkMode?'text-indigo-300':'text-indigo-900'}`}>
+                      <i className="fa-solid fa-robot"/> Groq IA Ejecutivo
+                    </h3>
+                    <div className="flex gap-1.5 no-print">
+                      {aiSummary&&(
+                        <button onClick={()=>setAiSummary(null)} title="Reiniciar informe"
+                          className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg flex items-center gap-1 transition-colors ${darkMode?'bg-slate-700 hover:bg-slate-600 text-slate-300':'bg-slate-200 hover:bg-slate-300 text-slate-600'}`}>
+                          <i className="fa-solid fa-rotate-left text-[10px]"/>
+                        </button>
+                      )}
+                      {aiSummary&&(
+                        <button onClick={downloadReport} title="Descargar informe gerencial"
+                          className="px-2.5 py-1.5 text-[11px] font-bold bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg flex items-center gap-1 transition-colors">
+                          <i className="fa-solid fa-file-arrow-down text-[10px]"/>
+                        </button>
+                      )}
+                      <button onClick={genSummary} disabled={aiGenSummary}
+                        className="px-3 py-1.5 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5 transition-colors ai-glow disabled:opacity-60 no-print">
+                        {aiGenSummary?<i className="fa-solid fa-circle-notch fa-spin text-[10px]"/>:<><i className="fa-solid fa-wand-magic-sparkles text-[10px]"/>Generar</>}
+                      </button>
+                    </div>
+                  </div>
+                  <div className={`flex-1 p-3 rounded-xl text-[11px] leading-relaxed overflow-y-auto min-h-[180px] ${darkMode?'bg-slate-900/70 text-slate-300 border border-slate-700/50':'bg-white text-slate-700 border border-slate-200'}`}>
+                    {aiGenSummary?<div className="flex flex-col items-center justify-center h-full text-indigo-400 gap-2 opacity-70"><i className="fa-solid fa-circle-notch fa-spin text-xl"/><p>Analizando con Groq...</p></div>
+                      :aiSummary?<p className="whitespace-pre-line">{aiSummary}</p>
+                      :<div className="flex flex-col items-center justify-center h-full text-center opacity-30 gap-2"><i className="fa-solid fa-chart-line text-3xl"/><p>Genera un reporte ejecutivo basado en los datos de Firebase.</p></div>}
+                  </div>
+                  {aiSummary&&(
+                    <button onClick={downloadReport}
+                      className="mt-3 w-full text-[11px] font-bold py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white flex items-center justify-center gap-2 transition-colors no-print">
+                      <i className="fa-solid fa-file-arrow-down"/> Descargar Informe Gerencial Completo
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Barras por bloque + Normas */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className={`kpi-card p-6 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                  <h3 className={`text-xs font-bold uppercase tracking-widest mb-5 ${darkMode?'text-slate-400':'text-slate-500'}`}>Avance por Bloque</h3>
+                  {blockStats.length===0?<p className={`text-sm italic text-center py-8 ${darkMode?'text-slate-600':'text-slate-400'}`}>Sin tareas en Firebase</p>
+                    :<div className="space-y-3">{blockStats.map((b,i)=>(
+                      <div key={i}>
+                        <div className="flex justify-between items-baseline mb-1">
+                          <span className={`text-xs font-semibold truncate max-w-[55%] ${darkMode?'text-slate-300':'text-slate-700'}`}>{b.name}</span>
+                          <div className="flex items-center gap-2">
+                            {b.blocked>0&&<span className="text-[10px] text-red-400 font-bold">{b.blocked}🛑</span>}
+                            <span className={`text-xs font-bold font-mono ${b.progress>=75?'text-emerald-500':b.progress>=40?'text-amber-500':'text-slate-400'}`}>{b.progress}%</span>
+                          </div>
+                        </div>
+                        <div className={`h-2 rounded-full overflow-hidden ${darkMode?'bg-slate-800':'bg-slate-100'}`}>
+                          <div className="h-full rounded-full bar-anim transition-all" style={{width:`${b.progress}%`,background:b.blocked>0?'linear-gradient(90deg,#ef4444,#f97316)':b.progress>=75?'linear-gradient(90deg,#22c55e,#10b981)':'linear-gradient(90deg,#3b82f6,#6366f1)',animationDelay:`${i*0.07}s`}}/>
+                        </div>
+                        <p className={`text-[10px] mt-0.5 ${darkMode?'text-slate-700':'text-slate-400'}`}>{b.done}/{b.total} completadas</p>
+                      </div>
+                    ))}</div>
+                  }
+                </div>
+
+                <div className={`kpi-card p-6 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                  <h3 className={`text-xs font-bold uppercase tracking-widest mb-5 ${darkMode?'text-slate-400':'text-slate-500'}`}>Cobertura por Norma</h3>
+                  <div className="space-y-3">
+                    {normaDist.map((n,i)=>{const pct=n.count>0?Math.round(n.done/n.count*100):0;return(
+                      <div key={i} className={`flex items-center gap-3 p-2.5 rounded-xl ${darkMode?'bg-slate-800/60':'bg-slate-50'}`}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-black text-white text-[10px]" style={{background:n.color}}>{n.name.substring(0,3).toUpperCase()}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between mb-1"><span className={`text-xs font-semibold truncate ${darkMode?'text-slate-200':'text-slate-700'}`}>{n.name}</span><span className={`text-[11px] font-mono font-bold ${darkMode?'text-slate-400':'text-slate-500'}`}>{n.done}/{n.count}</span></div>
+                          <div className={`h-1.5 rounded-full overflow-hidden ${darkMode?'bg-slate-700':'bg-slate-200'}`}><div className="h-full rounded-full transition-all duration-1000" style={{width:`${pct}%`,background:n.color}}/></div>
+                        </div>
+                        <span className="text-xs font-black font-mono w-8 text-right shrink-0" style={{color:n.color}}>{pct}%</span>
+                      </div>
+                    );})}
+                  </div>
+                  <div className={`mt-4 pt-4 border-t grid grid-cols-2 gap-3 ${darkMode?'border-slate-800':'border-slate-100'}`}>
+                    <div className={`p-3 rounded-xl text-center ${darkMode?'bg-slate-800':'bg-slate-50'}`}><p className={`text-[10px] uppercase font-bold mb-1 ${darkMode?'text-slate-500':'text-slate-400'}`}>Eficiencia</p><p className="text-xl font-black font-mono text-blue-500">{efficiencyRate}%</p></div>
+                    <div className={`p-3 rounded-xl text-center ${darkMode?'bg-slate-800':'bg-slate-50'}`}><p className={`text-[10px] uppercase font-bold mb-1 ${darkMode?'text-slate-500':'text-slate-400'}`}>Con Notas</p><p className="text-xl font-black font-mono text-amber-400">{notedTasks}</p></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabla */}
+              <div className={`kpi-card rounded-2xl border overflow-hidden ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                <div className={`px-6 py-3.5 border-b flex items-center justify-between ${darkMode?'bg-slate-800/60 border-slate-700':'bg-slate-50 border-slate-100'}`}>
+                  <h3 className={`text-xs font-bold uppercase tracking-widest flex items-center gap-2 ${darkMode?'text-slate-300':'text-slate-600'}`}><i className="fa-solid fa-table-list text-blue-500"/> Todas las Tareas</h3>
+                  <span className={`text-xs font-mono ${darkMode?'text-slate-500':'text-slate-400'}`}>{totalTasks} registros</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className={darkMode?'bg-slate-800/40':'bg-slate-50'}>
+                      {['Actividad','Bloque','Responsable','Prioridad','Semanas','Estado','Progreso'].map((h,i)=>(
+                        <th key={i} className={`px-4 py-2.5 text-left font-bold uppercase text-[10px] tracking-wider whitespace-nowrap ${darkMode?'text-slate-500':'text-slate-400'}`}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {tasks.length===0?<tr><td colSpan="7" className={`px-4 py-10 text-center italic ${darkMode?'text-slate-600':'text-slate-400'}`}>Sin tareas en Firebase</td></tr>
+                        :tasks.map(t=>{
+                          const overdue=currentWeek>t.end&&t.status!=='Done';
+                          const sc={'Done':{l:'Completada',c:'text-emerald-400 bg-emerald-900/20'},'In Progress':{l:'En Progreso',c:'text-blue-400 bg-blue-900/20'},'Blocked':{l:'Bloqueada',c:'text-red-400 bg-red-900/20'},'To Do':{l:'Pendiente',c:'text-slate-400 bg-slate-800'}}[t.status]||{l:'Pendiente',c:'text-slate-400 bg-slate-800'};
+                          return(<tr key={t.id} className={`border-t transition-colors ${darkMode?'border-slate-800 hover:bg-slate-800/40':'border-slate-100 hover:bg-slate-50'} ${overdue?'bg-red-900/10':''}`}>
+                            <td className={`px-4 py-2.5 font-semibold max-w-[180px] ${darkMode?'text-slate-200':'text-slate-800'}`}><span className="truncate block">{t.title}</span>{overdue&&<span className="text-[9px] text-red-400 font-bold">VENCIDA</span>}</td>
+                            <td className={`px-4 py-2.5 whitespace-nowrap ${darkMode?'text-slate-400':'text-slate-500'}`}>{t.block}</td>
+                            <td className="px-4 py-2.5"><span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${t.assignee==='Inspector'?'bg-blue-900/30 text-blue-400':t.assignee==='Aprendiz'?'bg-emerald-900/30 text-emerald-400':'bg-purple-900/30 text-purple-400'}`}>{t.assignee}</span></td>
+                            <td className="px-4 py-2.5"><span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${t.priority==='Alta'?'text-red-400 bg-red-900/20':t.priority==='Media'?'text-yellow-400 bg-yellow-900/20':'text-green-400 bg-green-900/20'}`}>{t.priority}</span></td>
+                            <td className={`px-4 py-2.5 font-mono whitespace-nowrap ${darkMode?'text-slate-400':'text-slate-500'}`}>S{t.start}–S{t.end}</td>
+                            <td className="px-4 py-2.5"><span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${sc.c}`}>{sc.l}</span></td>
+                            <td className="px-4 py-2.5 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-16 h-1.5 rounded-full overflow-hidden ${darkMode?'bg-slate-700':'bg-slate-200'}`}><div className="h-full rounded-full" style={{width:`${t.progress||0}%`,background:(t.progress||0)===100?'#22c55e':'#3b82f6'}}/></div>
+                                <span className="font-bold font-mono text-[11px]">{t.progress||0}%</span>
+                              </div>
+                            </td>
+                          </tr>);
+                        })
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>);
+          })()}
+
+          {/* ══ ANALÍTICA AVANZADA ══ */}
+          {activeTab==='analitica'&&(()=>{
+            // ── Datos para Burn-down ──
+            const totalWeeks=10;
+            const totalTasksAll=tasks.length;
+            // Ideal: línea recta de totalTasks a 0
+            const idealBurn=Array.from({length:totalWeeks+1},(_,i)=>Math.max(0,totalTasksAll-Math.round(totalTasksAll*(i/totalWeeks))));
+            // Real: tareas no-Done por semana (simulado con completedAt)
+            const completedByWeek=Array.from({length:totalWeeks},(_,i)=>tasks.filter(t=>t.status==='Done'&&(t.completedAt||0)>0&&(()=>{const w=t.end||i+1;return w<=i+1;})()).length);
+            let remaining=totalTasksAll;
+            const realBurn=Array.from({length:totalWeeks+1},(_,i)=>{
+              if(i===0)return totalTasksAll;
+              remaining=totalTasksAll-completedByWeek[i-1];
+              return Math.max(0,remaining);
+            });
+            // ── Burn-up ──
+            const cumDone=Array.from({length:totalWeeks+1},(_,i)=>i===0?0:completedByWeek[i-1]);
+            // ── Forecast lineal ──
+            const completedNow=tasks.filter(t=>t.status==='Done').length;
+            const weeksElapsed=Math.max(1,currentWeek);
+            const velocity=completedNow/weeksElapsed;
+            const remaining2=totalTasksAll-completedNow;
+            const weeksToClose=velocity>0?Math.ceil(remaining2/velocity):null;
+            const forecastWeek=weeksToClose!=null?currentWeek+weeksToClose:null;
+            // ── Cuello de botella por bloque ──
+            const blocks2=[...new Set(tasks.map(t=>t.block))];
+            const bottleneck=blocks2.map(b=>{
+              const bt=tasks.filter(t=>t.block===b);
+              const avgDelay=bt.reduce((a,t)=>a+Math.max(0,(currentWeek-t.end)*(t.status!=='Done'?1:0)),0)/Math.max(bt.length,1);
+              const blocked=bt.filter(t=>t.status==='Blocked').length;
+              return{name:b,avgDelay:parseFloat(avgDelay.toFixed(1)),blocked,total:bt.length,done:bt.filter(t=>t.status==='Done').length};
+            }).sort((a,b)=>b.avgDelay-a.avgDelay);
+            // ── Por responsable ──
+            const assignees=['Inspector','Aprendiz','Ambos'];
+            const respStats=assignees.map(r=>({
+              name:r,
+              total:tasks.filter(t=>t.assignee===r).length,
+              done:tasks.filter(t=>t.assignee===r&&t.status==='Done').length,
+              blocked:tasks.filter(t=>t.assignee===r&&t.status==='Blocked').length,
+              delay:tasks.filter(t=>t.assignee===r).reduce((a,t)=>a+Math.max(0,(currentWeek-t.end)*(t.status!=='Done'?1:0)),0)
+            }));
+            const maxDelay=Math.max(...bottleneck.map(b=>b.avgDelay),0.1);
+            // SVG Burn chart dimensions
+            const W=320,H=120,padL=30,padB=20,padT=10,padR=10;
+            const chartW=W-padL-padR,chartH=H-padB-padT;
+            const xScale=i=>(i/totalWeeks)*chartW+padL;
+            const yScale=v=>H-padB-((v/Math.max(totalTasksAll,1))*chartH);
+            const linePoints=arr=>arr.map((v,i)=>`${xScale(i)},${yScale(v)}`).join(' ');
+            return(
+              <div className="space-y-5">
+                {/* Forecast Banner */}
+                <div className={`p-5 rounded-2xl border flex flex-wrap gap-6 items-center ${darkMode?'bg-gradient-to-r from-indigo-950 to-slate-900 border-indigo-800/50':'bg-gradient-to-r from-indigo-50 to-white border-indigo-100'}`}>
+                  <div>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${darkMode?'text-indigo-400':'text-indigo-600'}`}>📈 Forecast de Cierre</p>
+                    <p className={`text-3xl font-black font-mono ${forecastWeek&&forecastWeek<=10?'text-emerald-400':forecastWeek?'text-amber-400':'text-slate-500'}`}>
+                      {forecastWeek?`Semana ${forecastWeek}`:velocity===0?'Sin datos':'Esta semana'}
+                    </p>
+                    <p className={`text-xs mt-1 ${darkMode?'text-slate-400':'text-slate-500'}`}>
+                      Velocidad: <span className="font-bold text-blue-400">{velocity.toFixed(1)} tareas/semana</span> · {remaining2} tareas restantes
+                    </p>
+                  </div>
+                  <div className="flex gap-4 flex-wrap">
+                    {[{l:'Completadas',v:completedNow,c:'text-emerald-400'},{l:'En progreso',v:tasks.filter(t=>t.status==='In Progress').length,c:'text-blue-400'},{l:'Bloqueadas',v:tasks.filter(t=>t.status==='Blocked').length,c:'text-red-400'},{l:'Pendientes',v:tasks.filter(t=>t.status==='To Do').length,c:'text-slate-400'}].map((s,i)=>(
+                      <div key={i} className={`px-4 py-2.5 rounded-xl ${darkMode?'bg-slate-800':'bg-white border border-slate-100'}`}>
+                        <p className={`text-[10px] uppercase font-bold ${darkMode?'text-slate-500':'text-slate-400'}`}>{s.l}</p>
+                        <p className={`text-2xl font-black font-mono ${s.c}`}>{s.v}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {forecastWeek&&forecastWeek>10&&(
+                    <div className={`px-4 py-3 rounded-xl border text-sm font-bold flex items-center gap-2 ${darkMode?'bg-amber-900/30 border-amber-800/50 text-amber-300':'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                      <i className="fa-solid fa-triangle-exclamation"/> A este ritmo se supera la semana 10. Aumentar velocidad.
+                    </div>
+                  )}
+                </div>
+
+                {/* Burn-down + Burn-up charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-chart-line mr-1 text-red-400"/>Burn-down Chart</h3>
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+                      {/* Grid */}
+                      {[0,0.25,0.5,0.75,1].map((f,i)=>(
+                        <g key={i}>
+                          <line x1={padL} x2={W-padR} y1={yScale(totalTasksAll*f)} y2={yScale(totalTasksAll*f)} stroke={darkMode?'#1e293b':'#f1f5f9'} strokeWidth="1"/>
+                          <text x={padL-4} y={yScale(totalTasksAll*f)+4} textAnchor="end" fontSize="7" fill={darkMode?'#475569':'#94a3b8'}>{Math.round(totalTasksAll*f)}</text>
+                        </g>
+                      ))}
+                      {Array.from({length:totalWeeks+1},(_,i)=>(
+                        <text key={i} x={xScale(i)} y={H-5} textAnchor="middle" fontSize="7" fill={darkMode?'#475569':'#94a3b8'}>S{i}</text>
+                      ))}
+                      {/* Ideal line */}
+                      <polyline points={linePoints(idealBurn)} fill="none" stroke="#475569" strokeWidth="1.5" strokeDasharray="4,3"/>
+                      {/* Real burn */}
+                      <polyline points={linePoints(realBurn)} fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      {/* Current week marker */}
+                      <line x1={xScale(currentWeek)} x2={xScale(currentWeek)} y1={padT} y2={H-padB} stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="3,2"/>
+                      <text x={xScale(currentWeek)+3} y={padT+10} fontSize="7" fill="#3b82f6" fontWeight="bold">Hoy S{currentWeek}</text>
+                    </svg>
+                    <div className="flex gap-4 mt-2 text-[10px]">
+                      <span className="flex items-center gap-1"><span className="w-5 h-0.5 bg-slate-500 inline-block" style={{borderTop:'1.5px dashed #475569'}}/> Ideal</span>
+                      <span className="flex items-center gap-1"><span className="w-5 h-0.5 bg-red-500 inline-block"/> Real</span>
+                      <span className="flex items-center gap-1"><span className="w-0.5 h-3 bg-blue-500 inline-block"/> Semana actual</span>
+                    </div>
+                  </div>
+
+                  <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-chart-area mr-1 text-emerald-400"/>Burn-up Chart</h3>
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+                      {[0,0.25,0.5,0.75,1].map((f,i)=>(
+                        <g key={i}>
+                          <line x1={padL} x2={W-padR} y1={yScale(totalTasksAll*f)} y2={yScale(totalTasksAll*f)} stroke={darkMode?'#1e293b':'#f1f5f9'} strokeWidth="1"/>
+                          <text x={padL-4} y={yScale(totalTasksAll*f)+4} textAnchor="end" fontSize="7" fill={darkMode?'#475569':'#94a3b8'}>{Math.round(totalTasksAll*f)}</text>
+                        </g>
+                      ))}
+                      {Array.from({length:totalWeeks+1},(_,i)=>(
+                        <text key={i} x={xScale(i)} y={H-5} textAnchor="middle" fontSize="7" fill={darkMode?'#475569':'#94a3b8'}>S{i}</text>
+                      ))}
+                      {/* Scope line */}
+                      <line x1={padL} x2={W-padR} y1={yScale(totalTasksAll)} y2={yScale(totalTasksAll)} stroke="#8b5cf6" strokeWidth="1.5" strokeDasharray="4,3"/>
+                      {/* Completed burn-up */}
+                      <polyline points={linePoints(cumDone)} fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <line x1={xScale(currentWeek)} x2={xScale(currentWeek)} y1={padT} y2={H-padB} stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="3,2"/>
+                    </svg>
+                    <div className="flex gap-4 mt-2 text-[10px]">
+                      <span className="flex items-center gap-1"><span className="w-4 h-0.5 inline-block" style={{borderTop:'1.5px dashed #8b5cf6'}}/> Scope</span>
+                      <span className="flex items-center gap-1"><span className="w-5 h-0.5 bg-emerald-500 inline-block"/> Completadas</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cuello de botella */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-4 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-traffic-cone mr-1 text-amber-400"/>Cuello de Botella — Bloques</h3>
+                    <div className="space-y-2.5">
+                      {bottleneck.slice(0,7).map((b,i)=>(
+                        <div key={i}>
+                          <div className="flex justify-between items-baseline mb-1">
+                            <span className={`text-[11px] font-semibold truncate max-w-[55%] ${i===0&&b.avgDelay>0?'text-amber-400':(darkMode?'text-slate-300':'text-slate-700')}`}>{b.name}</span>
+                            <div className="flex items-center gap-2 text-[10px]">
+                              {b.blocked>0&&<span className="text-red-400 font-bold">{b.blocked}🛑</span>}
+                              <span className={darkMode?'text-slate-500':'text-slate-400'}>{b.done}/{b.total}</span>
+                              <span className={`font-mono font-bold ${b.avgDelay>2?'text-red-400':b.avgDelay>0?'text-amber-400':'text-emerald-400'}`}>{b.avgDelay>0?`+${b.avgDelay}sem`:'✓'}</span>
+                            </div>
+                          </div>
+                          <div className={`h-1.5 rounded-full overflow-hidden ${darkMode?'bg-slate-800':'bg-slate-100'}`}>
+                            <div className="h-full rounded-full transition-all" style={{width:`${Math.min(100,(b.avgDelay/maxDelay)*100)}%`,background:b.avgDelay>2?'linear-gradient(90deg,#ef4444,#f97316)':b.avgDelay>0?'linear-gradient(90deg,#f59e0b,#eab308)':'#22c55e'}}/>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-4 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-users mr-1 text-blue-400"/>Carga por Responsable</h3>
+                    <div className="space-y-3">
+                      {respStats.map((r,i)=>{
+                        const pct=r.total>0?Math.round(r.done/r.total*100):0;
+                        const colors=['#3b82f6','#10b981','#8b5cf6'];
+                        return(
+                          <div key={i} className={`p-3 rounded-xl ${darkMode?'bg-slate-800':'bg-slate-50'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`text-xs font-bold ${darkMode?'text-slate-200':'text-slate-700'}`}><i className="fa-solid fa-user mr-1.5 text-[10px]"/>{r.name}</span>
+                              <div className="flex items-center gap-2 text-[10px]">
+                                {r.blocked>0&&<span className="text-red-400 font-bold">{r.blocked}🛑</span>}
+                                <span className={`font-mono font-bold`} style={{color:colors[i]}}>{pct}%</span>
+                              </div>
+                            </div>
+                            <div className={`h-2 rounded-full overflow-hidden ${darkMode?'bg-slate-700':'bg-slate-200'}`}>
+                              <div className="h-full rounded-full transition-all" style={{width:`${pct}%`,background:colors[i]}}/>
+                            </div>
+                            <div className="flex justify-between mt-1 text-[9px] text-slate-500">
+                              <span>{r.done} completadas de {r.total}</span>
+                              {r.delay>0&&<span className="text-amber-400">{r.delay} sem. acum. de retraso</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Entregables pendientes */}
+                <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                  <h3 className={`text-xs font-bold uppercase tracking-widest mb-3 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-box-open mr-1 text-indigo-400"/>Entregables Finales</h3>
+                  {tasks.filter(t=>t.entregable).length===0
+                    ?<p className={`text-xs italic py-4 text-center ${darkMode?'text-slate-600':'text-slate-400'}`}>No hay tareas marcadas como entregable. Edítalas para marcarlas.</p>
+                    :<div className="overflow-x-auto"><table className={`w-full text-xs ${darkMode?'text-slate-300':'text-slate-700'}`}>
+                      <thead><tr className={`text-[10px] uppercase tracking-wide ${darkMode?'text-slate-500':'text-slate-400'}`}>
+                        <th className="text-left pb-2 pr-3">Tarea</th><th className="text-left pb-2 pr-3">Bloque</th><th className="text-left pb-2 pr-3">Norma</th><th className="text-left pb-2 pr-3">Aprobador</th><th className="text-left pb-2">Estado</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {tasks.filter(t=>t.entregable).map(t=>(
+                          <tr key={t.id} className={`hover:${darkMode?'bg-slate-800':'bg-slate-50'} transition-colors`}>
+                            <td className="py-2 pr-3 font-semibold truncate max-w-[160px]">{t.title}</td>
+                            <td className="py-2 pr-3 text-slate-500">{t.block}</td>
+                            <td className="py-2 pr-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-900/40 text-indigo-300">{t.norma||'General'}</span></td>
+                            <td className="py-2 pr-3 text-slate-400">{t.aprobador||'—'}</td>
+                            <td className="py-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${t.status==='Done'?'bg-emerald-900/30 text-emerald-400':t.status==='Blocked'?'bg-red-900/30 text-red-400':'bg-blue-900/30 text-blue-400'}`}>{STATUS_LABEL[t.status]}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table></div>
+                  }
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ══ RIESGOS ══ */}
+          {activeTab==='riesgos'&&(()=>{
+            const PROB_VAL={'Baja':1,'Media':2,'Alta':3};
+            const IMP_VAL={'Leve':1,'Moderado':2,'Crítico':3};
+            const riskScore=t=>(PROB_VAL[t.riesgoProbabilidad||'Baja']||1)*(IMP_VAL[t.riesgoImpacto||'Leve']||1);
+            const riskColor=s=>s>=6?'#ef4444':s>=3?'#f59e0b':'#22c55e';
+            const riskLabel=s=>s>=6?'Crítico':s>=3?'Moderado':'Aceptable';
+            const withRisk=tasks.map(t=>({...t,rScore:riskScore(t)})).sort((a,b)=>b.rScore-a.rScore);
+
+            // Matriz 3x3
+            const matrixCells=[];
+            for(let imp=3;imp>=1;imp--){
+              for(let prob=1;prob<=3;prob++){
+                const s=prob*imp;
+                const tasksHere=tasks.filter(t=>(PROB_VAL[t.riesgoProbabilidad||'Baja']||1)===prob&&(IMP_VAL[t.riesgoImpacto||'Leve']||1)===imp);
+                matrixCells.push({prob,imp,s,tasks:tasksHere});
+              }
+            }
+
+            return(
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {/* Matriz de Riesgo */}
+                  <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-4 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-grid-2 mr-1 text-red-400"/>Matriz de Riesgo (Probabilidad × Impacto)</h3>
+                    <div className="overflow-x-auto">
+                      <div className="flex items-end gap-1 mb-1 ml-10">
+                        {['Baja','Media','Alta'].map(p=><div key={p} className="w-20 text-center text-[9px] font-bold text-slate-500 uppercase">{p}</div>)}
+                      </div>
+                      <div className="space-y-1">
+                        {[3,2,1].map(imp=>(
+                          <div key={imp} className="flex items-center gap-1">
+                            <div className="w-8 text-[9px] font-bold text-slate-500 uppercase text-right pr-1 shrink-0">{['','Leve','Mod.','Crít.'][imp]}</div>
+                            {[1,2,3].map(prob=>{
+                              const s=prob*imp;
+                              const cell=matrixCells.find(c=>c.prob===prob&&c.imp===imp);
+                              const bg=s>=6?darkMode?'bg-red-900/60 border-red-800':'bg-red-100 border-red-300':s>=3?darkMode?'bg-amber-900/50 border-amber-800':'bg-amber-50 border-amber-300':darkMode?'bg-emerald-900/30 border-emerald-800':'bg-emerald-50 border-emerald-300';
+                              return(
+                                <div key={prob} className={`w-20 h-16 rounded-lg border flex flex-col items-center justify-center text-center p-1 ${bg}`}>
+                                  <span className="font-black text-base" style={{color:riskColor(s)}}>{s}</span>
+                                  <span className="text-[9px] font-bold" style={{color:riskColor(s)}}>{riskLabel(s)}</span>
+                                  {cell&&cell.tasks.length>0&&<span className={`text-[8px] mt-0.5 font-bold ${darkMode?'text-slate-400':'text-slate-500'}`}>{cell.tasks.length} tarea{cell.tasks.length!==1?'s':''}</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                      <p className={`text-[9px] mt-2 ${darkMode?'text-slate-600':'text-slate-400'}`}>Eje X = Probabilidad · Eje Y = Impacto</p>
+                    </div>
+                  </div>
+
+                  {/* Top riesgos */}
+                  <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                    <h3 className={`text-xs font-bold uppercase tracking-widest mb-4 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-list-check mr-1 text-amber-400"/>Tareas por Nivel de Riesgo</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {withRisk.filter(t=>t.status!=='Done').slice(0,12).map(t=>(
+                        <div key={t.id} className={`flex items-center gap-3 p-2.5 rounded-xl ${darkMode?'bg-slate-800':'bg-slate-50'}`}>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-black text-white text-sm" style={{background:riskColor(t.rScore)}}>{t.rScore}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold truncate ${darkMode?'text-slate-200':'text-slate-700'}`}>{t.title}</p>
+                            <p className={`text-[10px] ${darkMode?'text-slate-500':'text-slate-400'}`}>{t.block} · {t.norma||'General'} · {t.assignee}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[10px] font-bold" style={{color:riskColor(t.rScore)}}>{riskLabel(t.rScore)}</p>
+                            <p className={`text-[9px] ${darkMode?'text-slate-600':'text-slate-400'}`}>{t.riesgoProbabilidad||'Baja'}×{t.riesgoImpacto||'Leve'}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {withRisk.filter(t=>t.status!=='Done').length===0&&<p className={`text-xs italic py-6 text-center ${darkMode?'text-slate-600':'text-slate-400'}`}>No hay tareas activas. ¡Todo completado!</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Editor de riesgo por tarea */}
+                <div className={`p-5 rounded-2xl border ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+                  <h3 className={`text-xs font-bold uppercase tracking-widest mb-4 ${darkMode?'text-slate-400':'text-slate-500'}`}><i className="fa-solid fa-sliders mr-1 text-blue-400"/>Asignar Riesgo por Tarea</h3>
+                  <div className="overflow-x-auto">
+                    <table className={`w-full text-xs ${darkMode?'text-slate-300':'text-slate-700'}`}>
+                      <thead><tr className={`text-[10px] uppercase tracking-wide ${darkMode?'text-slate-500':'text-slate-400'}`}>
+                        <th className="text-left pb-2 pr-3">Tarea</th>
+                        <th className="text-left pb-2 pr-3">Norma</th>
+                        <th className="text-left pb-2 pr-3">Probabilidad</th>
+                        <th className="text-left pb-2 pr-3">Impacto</th>
+                        <th className="text-left pb-2">Score</th>
+                      </tr></thead>
+                      <tbody className={`divide-y ${darkMode?'divide-slate-800':'divide-slate-100'}`}>
+                        {tasks.filter(t=>t.status!=='Done').map(t=>(
+                          <tr key={t.id}>
+                            <td className="py-1.5 pr-3 font-semibold truncate max-w-[160px]">{t.title}</td>
+                            <td className="py-1.5 pr-3"><span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-900/40 text-indigo-300">{t.norma||'General'}</span></td>
+                            <td className="py-1.5 pr-3">
+                              <select value={t.riesgoProbabilidad||'Baja'} onChange={e=>dbUpdate(t.id,{riesgoProbabilidad:e.target.value})}
+                                className={`text-[11px] border rounded-lg px-1.5 py-0.5 outline-none cursor-pointer ${darkMode?'bg-slate-800 border-slate-700':'bg-white border-slate-200'}`}>
+                                {RIESGO_PROB.map(p=><option key={p}>{p}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-1.5 pr-3">
+                              <select value={t.riesgoImpacto||'Leve'} onChange={e=>dbUpdate(t.id,{riesgoImpacto:e.target.value})}
+                                className={`text-[11px] border rounded-lg px-1.5 py-0.5 outline-none cursor-pointer ${darkMode?'bg-slate-800 border-slate-700':'bg-white border-slate-200'}`}>
+                                {RIESGO_IMP.map(p=><option key={p}>{p}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-1.5">
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-black text-white" style={{background:riskColor(riskScore(t))}}>{riskScore(t)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ══ HISTORIAL ══ */}
+          {activeTab==='activity'&&(
+            <div className={`rounded-2xl border overflow-hidden ${darkMode?'bg-slate-900 border-slate-800':'bg-white border-slate-200'}`}>
+              <div className={`px-6 py-4 border-b flex items-center justify-between ${darkMode?'bg-slate-800/60 border-slate-700':'bg-slate-50 border-slate-100'}`}>
+                <h3 className="font-bold flex items-center gap-2 text-sm"><i className="fa-solid fa-clock-rotate-left text-blue-500"/> Historial de Actividad</h3>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs font-mono ${darkMode?'text-slate-500':'text-slate-400'}`}>{notifications.length} eventos</span>
+                  {notifications.length>0&&(
+                    <button onClick={()=>notifsCol().get().then(s=>s.docs.forEach(d=>d.ref.delete()))}
+                      className="text-xs text-red-400 hover:text-red-300 font-bold transition-colors no-print">
+                      <i className="fa-solid fa-trash-can mr-1"/>Limpiar todo
+                    </button>
+                  )}
+                </div>
+              </div>
+              {notifications.length===0
+                ?<div className="flex flex-col items-center justify-center py-20 opacity-30">
+                    <i className="fa-solid fa-clock-rotate-left text-5xl mb-4"/>
+                    <p className="font-bold">Sin actividad registrada</p>
+                    <p className="text-sm mt-1">Las acciones del equipo aparecerán aquí</p>
+                  </div>
+                :<div className="divide-y divide-slate-800">
+                    {notifications.map((n,i)=>{
+                      const col=notifColorMap[n.color]||notifColorMap.blue;
+                      return(
+                        <div key={n.id||i} className={`flex gap-4 px-6 py-4 transition-colors ${darkMode?'hover:bg-slate-800/40':'hover:bg-slate-50'}`}>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${col}`}>
+                            <i className={`fa-solid ${n.icon||'fa-circle-dot'} text-sm`}/>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className={`font-bold text-sm ${darkMode?'text-slate-200':'text-slate-800'}`}>{n.title}</p>
+                              <p className={`text-[11px] font-mono shrink-0 ml-4 ${darkMode?'text-slate-600':'text-slate-400'}`}>{fmtDate(n.ts)}</p>
+                            </div>
+                            <p className={`text-xs ${darkMode?'text-slate-400':'text-slate-600'}`}>{n.body}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+              }
+            </div>
+          )}
+
+        </div>
+      </main>
+
+      {/* ══ MODAL Nueva Tarea ══ */}
+      {showAddModal&&(
+        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto" onClick={e=>{if(e.target===e.currentTarget)setShowAddModal(false);}}>
+          <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className={`rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 pb-8 sm:pb-6 w-full sm:max-w-md shadow-2xl border ${darkMode?'bg-slate-900 border-slate-700':'bg-white border-slate-200'}`} onClick={e=>e.stopPropagation()}>
+            <h3 className="text-base font-bold mb-5 flex items-center gap-2"><i className="fa-solid fa-plus text-blue-500"/> Nueva Tarea</h3>
+            <div className="space-y-4">
+              <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Título *</label>
+                <input type="text" value={newTask.title} onChange={e=>setNewTask({...newTask,title:e.target.value})} autoFocus
+                  className={`w-full border rounded-xl p-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-blue-500/50 ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`} placeholder="Ej. Revisión de soldadura..." autoFocus/>
+              </div>
+              <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Bloque de trabajo</label>
+                <input type="text" value={newTask.block} onChange={e=>setNewTask({...newTask,block:e.target.value})}
+                  className={`w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/50 ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}/>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Responsable</label>
+                  <select value={newTask.assignee} onChange={e=>setNewTask({...newTask,assignee:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}>
+                    <option>Inspector</option><option>Aprendiz</option><option>Ambos</option>
+                  </select>
+                </div>
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Norma</label>
+                  <select value={newTask.norma||'General'} onChange={e=>setNewTask({...newTask,norma:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}>
+                    {NORMAS.map(n=><option key={n}>{n}</option>)}
+                  </select>
+                </div>
+              <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Prioridad</label>
+                  <select value={newTask.priority} onChange={e=>setNewTask({...newTask,priority:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}>
+                    <option>Baja</option><option>Media</option><option>Alta</option>
+                  </select>
+                </div>
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Semana inicio</label>
+                  <input type="number" min="1" max="10" value={newTask.start} onChange={e=>setNewTask({...newTask,start:Number(e.target.value)})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}/>
+                </div>
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Semana fin</label>
+                  <input type="number" min="1" max="10" value={newTask.end} onChange={e=>setNewTask({...newTask,end:Number(e.target.value)})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}/>
+                </div>
+              </div>
+            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Aprobador</label>
+                  <input type="text" value={newTask.aprobador||''} onChange={e=>setNewTask({...newTask,aprobador:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`} placeholder="Ej. Gerencia"/>
+                </div>
+                <div className="flex flex-col justify-center"><label className="text-[11px] font-bold text-slate-500 block mb-2">Entregable Final</label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={!!newTask.entregable} onChange={e=>setNewTask({...newTask,entregable:e.target.checked})} className="accent-blue-500 w-4 h-4"/>
+                    <span className="text-xs font-semibold text-slate-400">Sí, es entregable</span>
+                  </label>
+                </div>
+              </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={()=>setShowAddModal(false)} className={`px-4 py-2 text-sm font-bold rounded-xl ${darkMode?'hover:bg-slate-800 text-slate-400':'hover:bg-slate-100 text-slate-500'}`}>Cancelar</button>
+              <button onClick={handleCreateTask} disabled={!newTask.title.trim()} className="px-5 py-2 text-sm font-bold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all disabled:opacity-50">Guardar Tarea</button>
+            </div>
+          </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL Editar Tarea ══ */}
+      {editTask&&(
+        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto" onClick={e=>{if(e.target===e.currentTarget)setEditTask(null);}}>
+          <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className={`rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 pb-8 sm:pb-6 w-full sm:max-w-md shadow-2xl border ${darkMode?'bg-slate-900 border-slate-700':'bg-white border-slate-200'}`} onClick={e=>e.stopPropagation()}>
+            <h3 className="text-base font-bold mb-5 flex items-center gap-2"><i className="fa-solid fa-pen text-indigo-400"/> Editar Tarea</h3>
+            <div className="space-y-4">
+              <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Título</label>
+                <input type="text" value={editTask.title} onChange={e=>setEditTask({...editTask,title:e.target.value})} autoFocus
+                  className={`w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}/>
+              </div>
+              <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Bloque</label>
+                <input type="text" value={editTask.block} onChange={e=>setEditTask({...editTask,block:e.target.value})}
+                  className={`w-full border rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}/>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Responsable</label>
+                  <select value={editTask.assignee} onChange={e=>setEditTask({...editTask,assignee:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}>
+                    <option>Inspector</option><option>Aprendiz</option><option>Ambos</option>
+                  </select>
+                </div>
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Prioridad</label>
+                  <select value={editTask.priority} onChange={e=>setEditTask({...editTask,priority:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}>
+                    <option>Baja</option><option>Media</option><option>Alta</option>
+                  </select>
+                </div>
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Semana inicio</label>
+                  <input type="number" min="1" max="10" value={editTask.start} onChange={e=>setEditTask({...editTask,start:Number(e.target.value)})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}/>
+                </div>
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Semana fin</label>
+                  <input type="number" min="1" max="10" value={editTask.end} onChange={e=>setEditTask({...editTask,end:Number(e.target.value)})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}/>
+                </div>
+              </div>
+            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Norma</label>
+                  <select value={editTask.norma||'General'} onChange={e=>setEditTask({...editTask,norma:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}>
+                    {NORMAS.map(n=><option key={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div><label className="text-[11px] font-bold text-slate-500 block mb-1">Aprobador</label>
+                  <input type="text" value={editTask.aprobador||''} onChange={e=>setEditTask({...editTask,aprobador:e.target.value})}
+                    className={`w-full border rounded-xl p-2.5 text-sm outline-none ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`} placeholder="Ej. Gerencia"/>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="checkbox" checked={!!editTask.entregable} onChange={e=>setEditTask({...editTask,entregable:e.target.checked})} className="accent-indigo-500 w-4 h-4"/>
+                <label className="text-xs font-semibold text-slate-400 cursor-pointer">Entregable Final (requiere aprobación)</label>
+              </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={()=>setEditTask(null)} className={`px-4 py-2 text-sm font-bold rounded-xl ${darkMode?'hover:bg-slate-800 text-slate-400':'hover:bg-slate-100 text-slate-500'}`}>Cancelar</button>
+              <button onClick={handleSaveEdit} className="px-5 py-2 text-sm font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all">Guardar Cambios</button>
+            </div>
+          </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL Bloqueo ══ */}
+      {blockingId&&(
+        <div className="fixed inset-0 bg-black/60 z-50 overflow-y-auto" onClick={e=>{if(e.target===e.currentTarget)setBlockingId(null);}}>
+          <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className={`rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 pb-8 sm:pb-6 w-full sm:max-w-md shadow-2xl border ${darkMode?'bg-slate-900 border-slate-700':'bg-white border-slate-200'}`} onClick={e=>e.stopPropagation()}>
+            <h3 className="text-base font-bold mb-4 text-red-400 flex items-center gap-2"><i className="fa-solid fa-lock"/> Motivo del Bloqueo</h3>
+            <textarea rows="3" value={blockReason} onChange={e=>setBlockReason(e.target.value)} autoFocus
+              className={`w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-red-500/40 ${darkMode?'bg-slate-800 border-slate-700':'bg-slate-50 border-slate-300'}`}
+              placeholder="Ej. Almacén no ha entregado materiales..."/>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={()=>setBlockingId(null)} className={`px-4 py-2 text-sm font-bold rounded-xl ${darkMode?'hover:bg-slate-800 text-slate-400':'hover:bg-slate-100 text-slate-500'}`}>Cancelar</button>
+              <button onClick={()=>{moveTask(blockingId,'Blocked',blockReason);setBlockingId(null);}}
+                className="px-5 py-2 text-sm font-bold bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all">Bloquear</button>
+            </div>
+          </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+
+  </script>
+
+</body>
+</html>
